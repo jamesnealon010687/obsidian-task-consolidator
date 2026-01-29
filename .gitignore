@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output (optional - include if you want to track builds)
+# dist/
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug
+npm-debug.log*
+
+# Local files
+*.local
+*.local.json
+
+# Temporary files
+*.tmp
+nul
+formatted_main.js

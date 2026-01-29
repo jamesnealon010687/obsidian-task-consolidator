@@ -1,0 +1,10 @@
+{
+  "id": "task-consolidator",
+  "name": "Task Consolidator",
+  "version": "2.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Consolidate all tasks from your notes into a single panel with sorting, filtering, Kanban board, recurring tasks, natural language dates, and more",
+  "author": "QT&E",
+  "authorUrl": "https://github.com/qte",
+  "isDesktopOnly": false
+}
