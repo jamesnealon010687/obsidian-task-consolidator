@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice } from 'obsidian';
 import type TaskConsolidatorPlugin from '../main';
 import { TaskCache } from '../core/taskCache';
 import { TaskUpdater } from '../core/taskUpdater';
@@ -7,9 +7,14 @@ import { TASK_VIEW_TYPE, SORT_OPTIONS, GROUP_OPTIONS, STAGES, KEYS, PRIORITY_ICO
 import { isOverdue, isDueToday, getRelativeDateString } from '../utils/dateUtils';
 import { compareNullableStrings } from '../utils/textUtils';
 import { formatLabel } from '../utils/textUtils';
-import { getDependencyStatus, createShortTaskId } from '../utils/dependencyUtils';
+import { getSubtaskProgress } from '../utils/textUtils';
+import { getDependencyStatus, createShortTaskId, buildShortIdMap } from '../utils/dependencyUtils';
+import { openTaskInEditor } from '../utils/editorUtils';
+import { parseSearchQuery } from '../utils/searchParser';
 import { KeyboardNavigationHandler, announceToScreenReader } from './keyboardNav';
 import { KeyboardHelpModal } from './keyboardHelpModal';
+import { ExportModal } from './exportModal';
+import { CommentModal } from './commentModal';
 
 // ========================================
 // Panel View
@@ -24,7 +29,9 @@ export class TaskPanelView extends ItemView {
   private selectedTasks: Set<string> = new Set();
   private keyboardHandler: KeyboardNavigationHandler | null = null;
   private taskListContainer: HTMLElement | null = null;
+  private taskSectionContainer: HTMLElement | null = null;
   private liveRegion: HTMLElement | null = null;
+  private headerRendered = false;
 
   constructor(leaf: WorkspaceLeaf, plugin: TaskConsolidatorPlugin) {
     super(leaf);
@@ -122,17 +129,34 @@ export class TaskPanelView extends ItemView {
   }
 
   async refresh(): Promise<void> {
-    await this.render();
+    if (!this.headerRendered) {
+      await this.render();
+      return;
+    }
+    // Partial re-render: only rebuild task sections
+    const scrollTop = this.taskSectionContainer?.scrollTop ?? 0;
+    this.applyFilters();
+    if (this.taskSectionContainer) {
+      this.taskSectionContainer.empty();
+      this.renderTaskSectionsInto(this.taskSectionContainer);
+      this.taskSectionContainer.scrollTop = scrollTop;
+    }
   }
 
   private async render(): Promise<void> {
     this.containerEl.empty();
+    this.headerRendered = false;
 
     this.renderHeader();
     this.renderControls();
     this.renderFilters();
+
+    // Create a dedicated container for task sections
+    this.taskSectionContainer = this.containerEl.createDiv({ cls: 'task-sections-container' });
+
     this.applyFilters();
-    this.renderTaskSections();
+    this.renderTaskSectionsInto(this.taskSectionContainer);
+    this.headerRendered = true;
   }
 
   private renderHeader(): void {
@@ -251,6 +275,15 @@ export class TaskPanelView extends ItemView {
       this.plugin.openProjectDashboard();
     });
 
+    // Export button (Feature 8)
+    controls.createEl('button', {
+      text: 'Export',
+      cls: 'export-btn',
+      attr: { 'aria-label': 'Export tasks' }
+    }).addEventListener('click', () => {
+      new ExportModal(this.app, this.plugin).open();
+    });
+
     // Help button
     controls.createEl('button', {
       text: '?',
@@ -259,6 +292,39 @@ export class TaskPanelView extends ItemView {
     }).addEventListener('click', () => {
       this.showKeyboardHelp();
     });
+
+    // Workspace selector (Feature 6)
+    if (this.plugin.settings.workspaces.length > 0) {
+      const wsContainer = controls.createDiv({ cls: 'workspace-selector' });
+      wsContainer.createSpan({ text: 'View: ' });
+      const wsSelect = wsContainer.createEl('select', { cls: 'dropdown' });
+      wsSelect.createEl('option', { text: 'Default', value: '' });
+      for (const ws of this.plugin.settings.workspaces) {
+        const opt = wsSelect.createEl('option', { text: ws.name, value: ws.id });
+        if (ws.id === this.plugin.settings.activeWorkspaceId) opt.selected = true;
+      }
+      wsSelect.addEventListener('change', async () => {
+        const wsId = wsSelect.value;
+        this.plugin.settings.activeWorkspaceId = wsId;
+        if (wsId) {
+          const ws = this.plugin.settings.workspaces.find(w => w.id === wsId);
+          if (ws) {
+            this.plugin.settings.sortBy = ws.sortBy;
+            this.plugin.settings.groupBy = ws.groupBy;
+            this.plugin.settings.showCompleted = ws.showCompleted;
+            this.plugin.settings.filterOwner = ws.filterOwner;
+            this.plugin.settings.filterProject = ws.filterProject;
+            this.plugin.settings.filterStage = ws.filterStage;
+            this.plugin.settings.filterPriority = ws.filterPriority;
+            this.plugin.settings.filterDueDate = ws.filterDueDate;
+            this.plugin.settings.filterTags = ws.filterTags;
+            this.plugin.settings.searchQuery = ws.searchQuery;
+          }
+        }
+        await this.plugin.saveSettings();
+        await this.render();
+      });
+    }
   }
 
   private renderFilters(): void {
@@ -278,6 +344,47 @@ export class TaskPanelView extends ItemView {
       await this.plugin.saveSettings();
       await this.refresh();
     });
+
+    // Save filter button (Feature 3)
+    if (this.plugin.settings.searchQuery) {
+      searchContainer.createEl('button', {
+        text: '💾',
+        cls: 'save-filter-btn',
+        attr: { 'aria-label': 'Save current search as filter' }
+      }).addEventListener('click', async () => {
+        const name = this.plugin.settings.searchQuery.substring(0, 30);
+        const id = Date.now().toString(36);
+        this.plugin.settings.savedFilters.push({ id, name, query: this.plugin.settings.searchQuery });
+        await this.plugin.saveSettings();
+        await this.render();
+        new Notice('Filter saved');
+      });
+    }
+
+    // Saved filter chips (Feature 3)
+    if (this.plugin.settings.savedFilters.length > 0) {
+      const savedChips = filters.createDiv({ cls: 'saved-filter-chips' });
+      for (const sf of this.plugin.settings.savedFilters) {
+        const chip = savedChips.createEl('button', {
+          text: sf.name,
+          cls: `saved-filter-chip ${sf.query === this.plugin.settings.searchQuery ? 'active' : ''}`,
+          attr: { 'aria-label': `Apply filter: ${sf.name}` }
+        });
+        chip.addEventListener('click', async () => {
+          this.plugin.settings.searchQuery = sf.query;
+          await this.plugin.saveSettings();
+          await this.render();
+        });
+        // Delete button on chip
+        const del = chip.createSpan({ text: ' ×', cls: 'saved-filter-delete' });
+        del.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.plugin.settings.savedFilters = this.plugin.settings.savedFilters.filter(f => f.id !== sf.id);
+          await this.plugin.saveSettings();
+          await this.render();
+        });
+      }
+    }
 
     // Owner filter
     filters.createSpan({ text: 'Owner: ' });
@@ -368,33 +475,50 @@ export class TaskPanelView extends ItemView {
     let tasks = this.taskCache.getAllTasks();
     const settings = this.plugin.settings;
 
-    // Search
+    // Advanced search with operator support
     if (settings.searchQuery) {
-      const query = settings.searchQuery.toLowerCase();
-      tasks = tasks.filter(t =>
-        t.text.toLowerCase().includes(query) ||
-        t.owner?.toLowerCase().includes(query) ||
-        t.project?.toLowerCase().includes(query) ||
-        t.tags.some(tag => tag.toLowerCase().includes(query))
-      );
+      const parsed = parseSearchQuery(settings.searchQuery);
+      if (parsed) {
+        // Apply parsed operator filters
+        if (parsed.owner) tasks = tasks.filter(t => t.owner?.toLowerCase() === parsed.owner!.toLowerCase());
+        if (parsed.project) tasks = tasks.filter(t => t.project?.toLowerCase() === parsed.project!.toLowerCase());
+        if (parsed.stage) tasks = tasks.filter(t => t.stage?.toLowerCase() === parsed.stage!.toLowerCase());
+        if (parsed.priority) tasks = tasks.filter(t => t.priority === parsed.priority);
+        if (parsed.tags && parsed.tags.length > 0) {
+          tasks = tasks.filter(t => parsed.tags!.every(tag => t.tags.includes(tag)));
+        }
+        if (parsed.filePath) {
+          const fp = parsed.filePath.toLowerCase();
+          tasks = tasks.filter(t => t.file.path.toLowerCase().includes(fp));
+        }
+        if (parsed.dueDateFilter === 'today') tasks = tasks.filter(t => isDueToday(t.dueDate));
+        else if (parsed.dueDateFilter === 'thisWeek') tasks = tasks.filter(t => t.dueDate != null);
+        else if (parsed.dueDateFilter === 'overdue') tasks = tasks.filter(t => isOverdue(t.dueDate) && !t.completed);
+        else if (parsed.dueDateFilter === 'noDueDate') tasks = tasks.filter(t => !t.dueDate);
+        if (parsed.dueDate) tasks = tasks.filter(t => t.dueDate === parsed.dueDate);
+        // Free text search
+        if (parsed.searchText) {
+          const query = parsed.searchText.toLowerCase();
+          tasks = tasks.filter(t =>
+            t.text.toLowerCase().includes(query) ||
+            t.owner?.toLowerCase().includes(query) ||
+            t.project?.toLowerCase().includes(query) ||
+            t.tags.some(tag => tag.toLowerCase().includes(query))
+          );
+        }
+      }
     }
 
-    // Owner
+    // Dropdown filters (applied on top of search)
     if (settings.filterOwner) {
       tasks = tasks.filter(t => t.owner === settings.filterOwner);
     }
-
-    // Project
     if (settings.filterProject) {
       tasks = tasks.filter(t => t.project === settings.filterProject);
     }
-
-    // Stage
     if (settings.filterStage) {
       tasks = tasks.filter(t => t.stage === settings.filterStage);
     }
-
-    // Due date
     if (settings.filterDueDate === 'today') {
       tasks = tasks.filter(t => isDueToday(t.dueDate));
     } else if (settings.filterDueDate === 'overdue') {
@@ -402,8 +526,6 @@ export class TaskPanelView extends ItemView {
     } else if (settings.filterDueDate) {
       tasks = tasks.filter(t => t.dueDate === settings.filterDueDate);
     }
-
-    // Priority
     if (settings.filterPriority) {
       tasks = tasks.filter(t => t.priority === settings.filterPriority);
     }
@@ -411,7 +533,7 @@ export class TaskPanelView extends ItemView {
     this.filteredTasks = tasks;
   }
 
-  private renderTaskSections(): void {
+  private renderTaskSectionsInto(container: HTMLElement): void {
     // Clean up keyboard handler
     if (this.keyboardHandler) {
       this.keyboardHandler.destroy();
@@ -425,7 +547,7 @@ export class TaskPanelView extends ItemView {
     const sortedCompleted = this.sortTasks(completedTasks);
 
     // Active tasks section
-    const activeSection = this.containerEl.createDiv({ cls: 'task-section' });
+    const activeSection = container.createDiv({ cls: 'task-section' });
     activeSection.createEl('h5', {
       text: `Active Tasks (${sortedActive.length})`,
       attr: { id: 'active-tasks-heading' }
@@ -455,7 +577,7 @@ export class TaskPanelView extends ItemView {
     }
 
     // Completed tasks section
-    const completedSection = this.containerEl.createDiv({ cls: 'task-section' });
+    const completedSection = container.createDiv({ cls: 'task-section' });
     const sectionHeader = completedSection.createDiv({ cls: 'task-section-header' });
 
     sectionHeader.createEl('span', {
@@ -698,6 +820,34 @@ export class TaskPanelView extends ItemView {
       meta.createSpan({ text: `📋 ${task.stage}`, cls: 'task-stage' });
     }
 
+    // Subtask progress indicator (Feature 4)
+    const progress = getSubtaskProgress(task);
+    if (progress) {
+      meta.createSpan({
+        text: `📊 ${progress.completed}/${progress.total}`,
+        cls: 'task-subtask-progress',
+        attr: { 'aria-label': `${progress.completed} of ${progress.total} subtasks completed` }
+      });
+    }
+
+    // Time tracking display (Feature 2)
+    if (this.plugin.settings.enableTimeTracking) {
+      if (task.estimate) {
+        meta.createSpan({
+          text: `⏱ ${task.estimate}`,
+          cls: 'task-estimate',
+          attr: { 'aria-label': `Estimate: ${task.estimate}` }
+        });
+      }
+      if (task.timeLogged) {
+        meta.createSpan({
+          text: `⏰ ${task.timeLogged}`,
+          cls: 'task-time-logged',
+          attr: { 'aria-label': `Logged: ${task.timeLogged}` }
+        });
+      }
+    }
+
     if (task.recurrence) {
       meta.createSpan({
         text: '🔄',
@@ -706,9 +856,25 @@ export class TaskPanelView extends ItemView {
       });
     }
 
+    // Comment indicator (Feature 5)
+    if (this.plugin.settings.enableComments) {
+      const comments = this.plugin.commentService?.getCommentsForTask(task.id) ?? [];
+      if (comments.length > 0) {
+        meta.createSpan({
+          text: `💬 ${comments.length}`,
+          cls: 'task-comment-count',
+          attr: { 'aria-label': `${comments.length} comments` }
+        }).addEventListener('click', (e) => {
+          e.stopPropagation();
+          new CommentModal(this.app, this.plugin, task).open();
+        });
+      }
+    }
+
     // Dependency status
     const allTasks = this.taskCache.getFilteredTasks({});
-    const depStatus = getDependencyStatus(task, allTasks);
+    const depIdMap = buildShortIdMap(allTasks);
+    const depStatus = getDependencyStatus(task, allTasks, depIdMap);
 
     if (depStatus.isBlocked) {
       const blockerNames = depStatus.blockedByTasks.map(id => createShortTaskId(id)).join(', ');
@@ -744,22 +910,8 @@ export class TaskPanelView extends ItemView {
       attr: { 'aria-label': `Open ${task.file.name}` }
     }).addEventListener('click', async (e) => {
       e.preventDefault();
-      await this.openTaskInEditor(task);
+      await openTaskInEditor(this.app, task);
     });
-  }
-
-  private async openTaskInEditor(task: Task): Promise<void> {
-    await this.app.workspace.getLeaf(false).openFile(task.file);
-
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (view?.editor) {
-      const editor = view.editor;
-      editor.setCursor({ line: task.lineNumber, ch: 0 });
-      editor.scrollIntoView(
-        { from: { line: task.lineNumber, ch: 0 }, to: { line: task.lineNumber, ch: 0 } },
-        true
-      );
-    }
   }
 
   private setupKeyboardNavigation(container: HTMLElement): void {
@@ -784,7 +936,7 @@ export class TaskPanelView extends ItemView {
         const task = this.filteredTasks.filter(t => !t.completed)[index];
         if (task) {
           this.announce(`Opening task: ${task.text}`);
-          await this.openTaskInEditor(task);
+          await openTaskInEditor(this.app, task);
         }
       }
     });

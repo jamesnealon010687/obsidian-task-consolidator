@@ -2,7 +2,7 @@ import { Modal, App } from 'obsidian';
 import type TaskConsolidatorPlugin from '../main';
 import { Task, TaskStats } from '../types';
 import { TaskCache } from '../core/taskCache';
-import { isOverdue, isDueToday, parseISODate, getToday, addDays } from '../utils/dateUtils';
+import { isOverdue, isDueToday, parseISODate, getToday, addDays, formatDateToISO } from '../utils/dateUtils';
 import { getDependencyStatus, getBlockedTasks, getReadyTasks } from '../utils/dependencyUtils';
 
 // ========================================
@@ -29,10 +29,13 @@ export interface ProjectStats {
 // Project Dashboard Modal
 // ========================================
 
+type DashboardTab = 'projects' | 'analytics';
+
 export class ProjectDashboardModal extends Modal {
   private plugin: TaskConsolidatorPlugin;
   private taskCache: TaskCache;
   private selectedProject: string | null = null;
+  private activeTab: DashboardTab = 'projects';
 
   constructor(app: App, plugin: TaskConsolidatorPlugin) {
     super(app);
@@ -57,15 +60,33 @@ export class ProjectDashboardModal extends Modal {
     const header = contentEl.createDiv({ cls: 'dashboard-header' });
     header.createEl('h2', { text: 'Project Dashboard' });
 
+    // Tab switcher
+    const tabs = contentEl.createDiv({ cls: 'dashboard-tabs' });
+    const projectsTab = tabs.createEl('button', {
+      text: 'Projects',
+      cls: `dashboard-tab ${this.activeTab === 'projects' ? 'active' : ''}`
+    });
+    projectsTab.addEventListener('click', () => { this.activeTab = 'projects'; this.render(); });
+
+    const analyticsTab = tabs.createEl('button', {
+      text: 'Analytics',
+      cls: `dashboard-tab ${this.activeTab === 'analytics' ? 'active' : ''}`
+    });
+    analyticsTab.addEventListener('click', () => { this.activeTab = 'analytics'; this.render(); });
+
     // Overall stats
     this.renderOverallStats(contentEl);
 
-    // Project grid
-    this.renderProjectGrid(contentEl);
+    if (this.activeTab === 'projects') {
+      // Project grid
+      this.renderProjectGrid(contentEl);
 
-    // Selected project details
-    if (this.selectedProject) {
-      this.renderProjectDetails(contentEl, this.selectedProject);
+      // Selected project details
+      if (this.selectedProject) {
+        this.renderProjectDetails(contentEl, this.selectedProject);
+      }
+    } else {
+      this.renderAnalytics(contentEl);
     }
   }
 
@@ -129,8 +150,22 @@ export class ProjectDashboardModal extends Modal {
   }
 
   private renderProjectCard(container: HTMLElement, stats: ProjectStats, projectKey: string | null): void {
+    const isSelected = this.selectedProject === projectKey;
     const card = container.createDiv({
-      cls: `project-card ${this.selectedProject === projectKey ? 'selected' : ''}`
+      cls: `project-card ${isSelected ? 'selected' : ''}`
+    });
+
+    // Keyboard navigation (P2 #17)
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-pressed', String(isSelected));
+    card.setAttribute('aria-label', `${stats.name}: ${stats.completionPercent}% complete, ${stats.total} tasks`);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.selectedProject = projectKey;
+        this.render();
+      }
     });
 
     // Project name
@@ -381,5 +416,118 @@ export class ProjectDashboardModal extends Modal {
       recentlyCompleted,
       upcomingTasks
     };
+  }
+
+  // ========================================
+  // Analytics Tab (Feature 7)
+  // ========================================
+
+  private renderAnalytics(container: HTMLElement): void {
+    const analytics = container.createDiv({ cls: 'dashboard-analytics' });
+    const allTasks = this.taskCache.getFilteredTasks({});
+
+    // Completion trends (last 30 days)
+    analytics.createEl('h3', { text: 'Completion Trends (Last 30 Days)' });
+    this.renderCompletionChart(analytics, allTasks);
+
+    // Velocity
+    analytics.createEl('h3', { text: 'Velocity' });
+    this.renderVelocity(analytics, allTasks);
+
+    // Owner breakdown
+    analytics.createEl('h3', { text: 'Owner Breakdown' });
+    this.renderOwnerChart(analytics, allTasks);
+
+    // Priority distribution
+    analytics.createEl('h3', { text: 'Priority Distribution' });
+    this.renderPriorityChart(analytics, allTasks);
+  }
+
+  private renderCompletionChart(container: HTMLElement, allTasks: Task[]): void {
+    const today = getToday();
+    const days: { label: string; count: number }[] = [];
+    let maxCount = 1;
+
+    for (let i = 29; i >= 0; i--) {
+      const date = addDays(today, -i);
+      const dateStr = formatDateToISO(date);
+      const count = allTasks.filter(t => t.completedDate === dateStr).length;
+      if (count > maxCount) maxCount = count;
+      days.push({ label: dateStr.slice(5), count });
+    }
+
+    const chart = container.createDiv({ cls: 'analytics-bar-chart' });
+    for (const day of days) {
+      const bar = chart.createDiv({ cls: 'analytics-bar' });
+      const heightPercent = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
+      const fill = bar.createDiv({ cls: 'analytics-bar-fill' });
+      fill.style.height = `${heightPercent}%`;
+      bar.setAttribute('title', `${day.label}: ${day.count} completed`);
+      bar.setAttribute('aria-label', `${day.label}: ${day.count} completed`);
+    }
+  }
+
+  private renderVelocity(container: HTMLElement, allTasks: Task[]): void {
+    const today = getToday();
+    const weeks: number[] = [];
+    for (let w = 0; w < 4; w++) {
+      const weekEnd = addDays(today, -w * 7);
+      const weekStart = addDays(weekEnd, -6);
+      const startStr = formatDateToISO(weekStart);
+      const endStr = formatDateToISO(weekEnd);
+      const count = allTasks.filter(t =>
+        t.completedDate && t.completedDate >= startStr && t.completedDate <= endStr
+      ).length;
+      weeks.push(count);
+    }
+    const avg = weeks.length > 0 ? Math.round(weeks.reduce((a, b) => a + b, 0) / weeks.length) : 0;
+    const info = container.createDiv({ cls: 'analytics-velocity' });
+    info.createDiv({ cls: 'analytics-velocity-number', text: String(avg) });
+    info.createDiv({ cls: 'analytics-velocity-label', text: 'tasks/week (4-week average)' });
+    const weekDetails = container.createDiv({ cls: 'analytics-week-details' });
+    weeks.forEach((count, i) => {
+      weekDetails.createSpan({ text: `Week -${i}: ${count}`, cls: 'analytics-week-item' });
+    });
+  }
+
+  private renderOwnerChart(container: HTMLElement, allTasks: Task[]): void {
+    const ownerCounts = new Map<string, number>();
+    for (const task of allTasks) {
+      const owner = task.owner ?? 'No Owner';
+      ownerCounts.set(owner, (ownerCounts.get(owner) ?? 0) + 1);
+    }
+    const maxCount = Math.max(1, ...ownerCounts.values());
+    const chart = container.createDiv({ cls: 'analytics-horizontal-chart' });
+    for (const [owner, count] of [...ownerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
+      const row = chart.createDiv({ cls: 'analytics-h-bar-row' });
+      row.createDiv({ cls: 'analytics-h-bar-label', text: owner });
+      const barContainer = row.createDiv({ cls: 'analytics-h-bar-container' });
+      const fill = barContainer.createDiv({ cls: 'analytics-h-bar-fill' });
+      fill.style.width = `${(count / maxCount) * 100}%`;
+      row.createDiv({ cls: 'analytics-h-bar-value', text: String(count) });
+    }
+  }
+
+  private renderPriorityChart(container: HTMLElement, allTasks: Task[]): void {
+    const priorityCounts = { high: 0, medium: 0, low: 0, none: 0 };
+    for (const task of allTasks) {
+      const p = task.priority ?? 'none';
+      priorityCounts[p as keyof typeof priorityCounts] = (priorityCounts[p as keyof typeof priorityCounts] ?? 0) + 1;
+    }
+    const total = allTasks.length || 1;
+    const chart = container.createDiv({ cls: 'analytics-segmented-bar' });
+    const colors: Record<string, string> = { high: 'var(--text-error)', medium: '#f0a000', low: 'var(--text-success)', none: 'var(--text-muted)' };
+    for (const [priority, count] of Object.entries(priorityCounts)) {
+      if (count === 0) continue;
+      const pct = Math.round((count / total) * 100);
+      const segment = chart.createDiv({ cls: 'analytics-segment' });
+      segment.style.width = `${pct}%`;
+      segment.style.backgroundColor = colors[priority] ?? 'var(--text-muted)';
+      segment.setAttribute('title', `${priority}: ${count} (${pct}%)`);
+      segment.setAttribute('aria-label', `${priority}: ${count} tasks, ${pct}%`);
+      if (pct > 10) {
+        segment.createSpan({ text: `${priority.charAt(0).toUpperCase()}${priority.slice(1)} ${pct}%`, cls: 'analytics-segment-label' });
+      }
+    }
   }
 }

@@ -53,6 +53,9 @@ export interface Task {
   // Dependencies
   blockedBy: string[];  // Task IDs this task is blocked by
   blocks: string[];     // Task IDs this task blocks
+  // Time tracking
+  estimate: string | null;
+  timeLogged: string | null;
 }
 
 // ========================================
@@ -134,6 +137,25 @@ export interface TaskConsolidatorSettings {
   reminderCheckIntervalMinutes: number;
   showNotificationBadge: boolean;
   lastNotificationCheck: number;
+
+  // Time Tracking
+  enableTimeTracking: boolean;
+
+  // Task Templates
+  taskTemplates: TaskTemplate[];
+
+  // Saved Filters
+  savedFilters: SavedFilter[];
+
+  // Comments
+  enableComments: boolean;
+
+  // Workspaces
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
+
+  // Smart Suggestions
+  enableSmartSuggestions: boolean;
 }
 
 // ========================================
@@ -265,6 +287,8 @@ export interface ParsedMetadata {
   createdDate: string | null;
   blockedBy: string[];
   blocks: string[];
+  estimate: string | null;
+  timeLogged: string | null;
 }
 
 // ========================================
@@ -311,4 +335,60 @@ export interface DependencyStatus {
   blocksCount: number;
   blockedByTasks: string[];
   blocksTasks: string[];
+}
+
+// ========================================
+// Task Template
+// ========================================
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  text: string;
+  owner: string;
+  project: string;
+  stage: string;
+  priority: string;
+  tags: string[];
+  variables: string[];
+}
+
+// ========================================
+// Task Comment
+// ========================================
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  text: string;
+  timestamp: number;
+}
+
+// ========================================
+// Saved Filter
+// ========================================
+
+export interface SavedFilter {
+  id: string;
+  name: string;
+  query: string;
+}
+
+// ========================================
+// Workspace
+// ========================================
+
+export interface Workspace {
+  id: string;
+  name: string;
+  sortBy: SortOption;
+  groupBy: GroupOption;
+  showCompleted: boolean;
+  filterOwner: string;
+  filterProject: string;
+  filterStage: string;
+  filterPriority: string;
+  filterDueDate: string;
+  filterTags: string[];
+  searchQuery: string;
 }

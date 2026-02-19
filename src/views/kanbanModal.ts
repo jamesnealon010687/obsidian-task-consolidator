@@ -1,4 +1,4 @@
-import { Modal, App, Notice, MarkdownView } from 'obsidian';
+import { Modal, App, Notice } from 'obsidian';
 import type TaskConsolidatorPlugin from '../main';
 import { TaskCache } from '../core/taskCache';
 import { TaskUpdater } from '../core/taskUpdater';
@@ -6,6 +6,7 @@ import { Task, TaskConsolidatorSettings, Stage, KanbanColumn } from '../types';
 import { KANBAN_COLUMNS, PRIORITY_ICONS } from '../types/constants';
 import { isOverdue, getRelativeDateString } from '../utils/dateUtils';
 import { compareNullableStrings } from '../utils/textUtils';
+import { openTaskInEditor } from '../utils/editorUtils';
 
 // ========================================
 // Kanban Modal
@@ -139,6 +140,11 @@ export class KanbanModal extends Modal {
     card.dataset.filePath = task.file.path;
     card.dataset.lineNumber = String(task.lineNumber);
 
+    // ARIA labels (P2 #15)
+    const ariaLabel = [task.text, task.owner ? `Owner: ${task.owner}` : '', task.dueDate ? `Due: ${task.dueDate}` : '', task.priority ? `Priority: ${task.priority}` : ''].filter(Boolean).join(', ');
+    card.setAttribute('aria-label', ariaLabel);
+    card.setAttribute('role', 'article');
+
     // Add styling classes
     if (isOverdue(task.dueDate) && !task.completed) {
       card.addClass('overdue');
@@ -156,14 +162,16 @@ export class KanbanModal extends Modal {
     if (task.priority) {
       meta.createSpan({
         cls: 'kanban-card-priority',
-        text: PRIORITY_ICONS[task.priority]
+        text: PRIORITY_ICONS[task.priority],
+        attr: { 'aria-label': `Priority: ${task.priority}` }
       });
     }
 
     if (task.owner) {
       meta.createSpan({
         cls: 'kanban-card-owner',
-        text: `👤 ${task.owner}`
+        text: `👤 ${task.owner}`,
+        attr: { 'aria-label': `Owner: ${task.owner}` }
       });
     }
 
@@ -189,7 +197,8 @@ export class KanbanModal extends Modal {
     if (task.recurrence) {
       meta.createSpan({
         cls: 'kanban-card-recurring',
-        text: '🔄'
+        text: '🔄',
+        attr: { 'aria-label': 'Recurring task' }
       });
     }
 
@@ -199,7 +208,7 @@ export class KanbanModal extends Modal {
       text: `📄 ${task.file.basename}`
     }).addEventListener('click', (e) => {
       e.stopPropagation();
-      this.openTaskInEditor(task);
+      this.openTask(task);
     });
 
     // Keyboard-accessible move buttons
@@ -316,19 +325,8 @@ export class KanbanModal extends Modal {
     this.renderBoard(this.contentEl);
   }
 
-  private async openTaskInEditor(task: Task): Promise<void> {
-    await this.app.workspace.getLeaf(false).openFile(task.file);
-
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (view?.editor) {
-      const editor = view.editor;
-      editor.setCursor({ line: task.lineNumber, ch: 0 });
-      editor.scrollIntoView(
-        { from: { line: task.lineNumber, ch: 0 }, to: { line: task.lineNumber, ch: 0 } },
-        true
-      );
-    }
-
+  private async openTask(task: Task): Promise<void> {
+    await openTaskInEditor(this.app, task);
     this.close();
   }
 }

@@ -100,3 +100,14 @@ export function compareNullableStrings(a: string | null, b: string | null): numb
   if (b === null) return -1;
   return a.localeCompare(b);
 }
+
+/**
+ * Get subtask progress for a parent task.
+ * Returns {completed, total} or null if no children.
+ */
+export function getSubtaskProgress(task: { children: { completed: boolean }[] }): { completed: number; total: number } | null {
+  if (!task.children || task.children.length === 0) return null;
+  const total = task.children.length;
+  const completed = task.children.filter(c => c.completed).length;
+  return { completed, total };
+}

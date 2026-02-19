@@ -2234,3 +2234,604 @@ a:focus:not(:focus-visible) {
     align-items: flex-start;
   }
 }
+
+/* ========================================
+   Kanban Card Actions (P2 #9)
+   ======================================== */
+.kanban-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.kanban-move-btn {
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.kanban-move-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ========================================
+   Calendar Task Count (P2 #16)
+   ======================================== */
+.calendar-task-count {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  position: absolute;
+  top: 2px;
+  right: 4px;
+}
+
+.calendar-cell {
+  position: relative;
+}
+
+/* ========================================
+   Saved Filter Chips (Feature 3)
+   ======================================== */
+.saved-filter-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.saved-filter-chip {
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--interactive-accent);
+  background: transparent;
+  color: var(--interactive-accent);
+  font-size: 0.8em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.saved-filter-chip.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.saved-filter-chip:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.saved-filter-delete {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-filter-btn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1em;
+}
+
+/* ========================================
+   Task Subtask Progress (Feature 4)
+   ======================================== */
+.task-subtask-progress {
+  padding: 2px 6px;
+  background-color: var(--background-secondary);
+  border-radius: 3px;
+  white-space: nowrap;
+  color: var(--interactive-accent);
+  font-weight: 500;
+}
+
+/* ========================================
+   Task Time Tracking (Feature 2)
+   ======================================== */
+.task-estimate,
+.task-time-logged {
+  padding: 2px 6px;
+  background-color: var(--background-secondary);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.task-estimate {
+  color: var(--text-accent);
+}
+
+.task-time-logged {
+  color: var(--text-success);
+}
+
+/* ========================================
+   Task Comment Count (Feature 5)
+   ======================================== */
+.task-comment-count {
+  padding: 2px 6px;
+  background-color: var(--background-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.task-comment-count:hover {
+  color: var(--interactive-accent);
+}
+
+/* ========================================
+   Workspace Selector (Feature 6)
+   ======================================== */
+.workspace-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ========================================
+   Export Button (Feature 8)
+   ======================================== */
+.task-consolidator-controls .export-btn {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+.task-consolidator-controls .export-btn:hover {
+  background-color: var(--interactive-hover);
+}
+
+/* ========================================
+   Export Modal (Feature 8)
+   ======================================== */
+.export-modal {
+  width: 400px;
+  max-width: 90vw;
+}
+
+.export-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.export-buttons button {
+  padding: 8px 16px;
+  border-radius: 5px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+}
+
+/* ========================================
+   Workspace Modal (Feature 6)
+   ======================================== */
+.workspace-modal {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.workspace-list {
+  margin-bottom: 16px;
+}
+
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.workspace-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.workspace-desc {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.workspace-save {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ========================================
+   Comment Modal (Feature 5)
+   ======================================== */
+.comment-modal {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.comment-task-text {
+  padding: 8px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.comment-list {
+  margin-bottom: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.comment-item {
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.comment-text {
+  margin-bottom: 4px;
+}
+
+.comment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.comment-delete {
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.comment-delete:hover {
+  color: var(--text-error);
+}
+
+.comment-add {
+  margin-bottom: 12px;
+}
+
+/* ========================================
+   Template Modal (Feature 1)
+   ======================================== */
+.template-modal {
+  width: 550px;
+  max-width: 90vw;
+}
+
+.template-list {
+  margin-bottom: 16px;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.template-name {
+  font-weight: 600;
+}
+
+.template-preview {
+  flex: 1;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.template-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.template-editor {
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.template-vars-info {
+  font-size: 0.85em;
+  color: var(--interactive-accent);
+  font-style: italic;
+}
+
+.template-editor-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.template-close-btn {
+  margin-top: 12px;
+}
+
+/* ========================================
+   Time Report Modal (Feature 2)
+   ======================================== */
+.time-report-modal {
+  width: 600px;
+  max-width: 90vw;
+}
+
+.time-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.time-report-table th,
+.time-report-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  text-align: left;
+}
+
+.time-report-table th {
+  background: var(--background-secondary);
+  font-weight: 600;
+}
+
+/* ========================================
+   Smart Suggestion Chips (Feature 10)
+   ======================================== */
+.suggestion-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.suggestion-chip {
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.8em;
+  cursor: pointer;
+}
+
+.suggestion-chip:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* ========================================
+   Dashboard Tabs (Feature 7)
+   ======================================== */
+.dashboard-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.dashboard-tab {
+  padding: 8px 20px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.dashboard-tab.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.dashboard-tab:hover:not(.active) {
+  background: var(--background-modifier-hover);
+}
+
+/* Analytics Styles (Feature 7) */
+.dashboard-analytics h3 {
+  margin: 20px 0 10px 0;
+  color: var(--text-normal);
+}
+
+.analytics-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 100px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.analytics-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  cursor: help;
+}
+
+.analytics-bar-fill {
+  width: 100%;
+  background: var(--interactive-accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s;
+}
+
+.analytics-velocity {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.analytics-velocity-number {
+  font-size: 2.5em;
+  font-weight: 700;
+  color: var(--interactive-accent);
+}
+
+.analytics-velocity-label {
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.analytics-week-details {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.analytics-week-item {
+  padding: 4px 8px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.analytics-horizontal-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analytics-h-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-h-bar-label {
+  min-width: 80px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.analytics-h-bar-container {
+  flex: 1;
+  height: 20px;
+  background: var(--background-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.analytics-h-bar-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.analytics-h-bar-value {
+  min-width: 30px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.analytics-segmented-bar {
+  display: flex;
+  height: 30px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.analytics-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2px;
+  transition: width 0.3s;
+}
+
+.analytics-segment-label {
+  font-size: 0.7em;
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  white-space: nowrap;
+}
+
+/* ========================================
+   Mobile Improvements (Feature 9)
+   ======================================== */
+@media (max-width: 768px) {
+  /* Full-width modals */
+  .export-modal,
+  .workspace-modal,
+  .comment-modal,
+  .template-modal,
+  .time-report-modal {
+    width: 100vw;
+    max-width: none;
+  }
+
+  /* Stack kanban columns vertically */
+  .kanban-board {
+    flex-direction: column;
+  }
+
+  .kanban-column {
+    flex: none;
+    width: 100%;
+  }
+
+  /* Collapse filter row */
+  .task-consolidator-filters {
+    max-height: 44px;
+    overflow: hidden;
+    transition: max-height 0.3s;
+  }
+
+  .task-consolidator-filters.expanded {
+    max-height: 500px;
+  }
+
+  /* Larger touch targets */
+  .kanban-move-btn {
+    min-height: 36px;
+    font-size: 0.85em;
+    padding: 6px 10px;
+  }
+
+  .saved-filter-chip,
+  .suggestion-chip {
+    min-height: 36px;
+    font-size: 0.9em;
+    padding: 6px 12px;
+  }
+}

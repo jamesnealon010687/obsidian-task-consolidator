@@ -194,7 +194,10 @@ export const PATTERNS = {
   QUICK_DATE: /!([\w\-/]+)/,
   // Dependency patterns: [blocked-by:task-id] or [blocks:task-id]
   BLOCKED_BY: /\[blocked-by:([^\]]+)\]/gi,
-  BLOCKS: /\[blocks:([^\]]+)\]/gi
+  BLOCKS: /\[blocks:([^\]]+)\]/gi,
+  // Time tracking patterns
+  ESTIMATE: /\[estimate:([^\]]+)\]/i,
+  TIME_LOGGED: /\[logged:([^\]]+)\]/i
 };
 
 // ========================================

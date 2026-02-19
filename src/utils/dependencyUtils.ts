@@ -19,6 +19,21 @@ export function createShortTaskId(fullId: string): string {
 }
 
 /**
+ * Build a map from short IDs (basename:line) to full IDs (path:line) for O(1) lookups.
+ * This replaces the O(n) expandShortTaskId calls in dependency functions.
+ */
+export function buildShortIdMap(allTasks: Task[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const task of allTasks) {
+    const shortId = `${task.file.basename.replace('.md', '')}:${task.lineNumber}`;
+    map.set(shortId, task.id);
+    // Also map full ID to itself for direct lookups
+    map.set(task.id, task.id);
+  }
+  return map;
+}
+
+/**
  * Expand a short task ID to a full ID if possible
  * Uses available tasks to find matching files
  */
@@ -53,15 +68,30 @@ export function expandShortTaskId(shortId: string, allTasks: Task[]): string | n
 }
 
 /**
+ * Resolve a short ID using the pre-built map (O(1) instead of O(n))
+ */
+function resolveId(shortId: string, idMap: Map<string, string>): string | null {
+  // Direct lookup
+  const direct = idMap.get(shortId);
+  if (direct) return direct;
+  // If it's already a full path, return as-is
+  if (shortId.includes('/') || shortId.includes('\\')) {
+    return idMap.has(shortId) ? shortId : shortId;
+  }
+  return null;
+}
+
+/**
  * Get dependency status for a task
  */
-export function getDependencyStatus(task: Task, allTasks: Task[]): DependencyStatus {
+export function getDependencyStatus(task: Task, allTasks: Task[], idMap?: Map<string, string>): DependencyStatus {
+  const shortIdMap = idMap ?? buildShortIdMap(allTasks);
   const taskMap = new Map(allTasks.map(t => [t.id, t]));
 
   // Check which blocking tasks are still incomplete
   const blockedByTasks: string[] = [];
   for (const blockerId of task.blockedBy) {
-    const expandedId = expandShortTaskId(blockerId, allTasks);
+    const expandedId = resolveId(blockerId, shortIdMap);
     if (expandedId) {
       const blocker = taskMap.get(expandedId);
       if (blocker && !blocker.completed) {
@@ -76,7 +106,7 @@ export function getDependencyStatus(task: Task, allTasks: Task[]): DependencySta
   // Get tasks that this task blocks
   const blocksTasks: string[] = [];
   for (const blockedId of task.blocks) {
-    const expandedId = expandShortTaskId(blockedId, allTasks);
+    const expandedId = resolveId(blockedId, shortIdMap);
     if (expandedId) {
       blocksTasks.push(expandedId);
     } else {
@@ -89,7 +119,7 @@ export function getDependencyStatus(task: Task, allTasks: Task[]): DependencySta
     if (otherTask.id === task.id) continue;
 
     for (const blockerId of otherTask.blockedBy) {
-      const expandedId = expandShortTaskId(blockerId, allTasks);
+      const expandedId = resolveId(blockerId, shortIdMap);
       if (expandedId === task.id && !blocksTasks.includes(otherTask.id)) {
         blocksTasks.push(otherTask.id);
       }
@@ -109,18 +139,16 @@ export function getDependencyStatus(task: Task, allTasks: Task[]): DependencySta
  * Check if completing a task would unblock other tasks
  */
 export function getTasksThatWouldBeUnblocked(completedTask: Task, allTasks: Task[]): Task[] {
+  const shortIdMap = buildShortIdMap(allTasks);
   const unblockedTasks: Task[] = [];
 
   for (const task of allTasks) {
     if (task.completed || task.id === completedTask.id) continue;
 
-    // Check if this task is blocked by the completed task
     for (const blockerId of task.blockedBy) {
-      const expandedId = expandShortTaskId(blockerId, allTasks);
+      const expandedId = resolveId(blockerId, shortIdMap);
       if (expandedId === completedTask.id) {
-        // Check if this was the only blocker
-        const status = getDependencyStatus(task, allTasks);
-        // After completing this task, would it be unblocked?
+        const status = getDependencyStatus(task, allTasks, shortIdMap);
         const remainingBlockers = status.blockedByTasks.filter(id => id !== completedTask.id);
         if (remainingBlockers.length === 0) {
           unblockedTasks.push(task);
@@ -137,39 +165,30 @@ export function getTasksThatWouldBeUnblocked(completedTask: Task, allTasks: Task
  * Get all dependency links for visualization
  */
 export function getAllDependencyLinks(allTasks: Task[]): DependencyLink[] {
+  const shortIdMap = buildShortIdMap(allTasks);
   const links: DependencyLink[] = [];
   const seen = new Set<string>();
 
   for (const task of allTasks) {
-    // Add blockedBy links
     for (const blockerId of task.blockedBy) {
-      const expandedId = expandShortTaskId(blockerId, allTasks);
+      const expandedId = resolveId(blockerId, shortIdMap);
       const sourceId = expandedId ?? blockerId;
       const linkKey = `${sourceId}->${task.id}`;
 
       if (!seen.has(linkKey)) {
         seen.add(linkKey);
-        links.push({
-          sourceId,
-          targetId: task.id,
-          type: 'blockedBy'
-        });
+        links.push({ sourceId, targetId: task.id, type: 'blockedBy' });
       }
     }
 
-    // Add blocks links
     for (const blockedId of task.blocks) {
-      const expandedId = expandShortTaskId(blockedId, allTasks);
+      const expandedId = resolveId(blockedId, shortIdMap);
       const targetId = expandedId ?? blockedId;
       const linkKey = `${task.id}->${targetId}`;
 
       if (!seen.has(linkKey)) {
         seen.add(linkKey);
-        links.push({
-          sourceId: task.id,
-          targetId,
-          type: 'blocks'
-        });
+        links.push({ sourceId: task.id, targetId, type: 'blocks' });
       }
     }
   }
@@ -185,10 +204,10 @@ export function detectCircularDependency(
   task: Task,
   allTasks: Task[],
   visited: Set<string> = new Set(),
-  path: string[] = []
+  path: string[] = [],
+  idMap?: Map<string, string>
 ): string[] | null {
   if (visited.has(task.id)) {
-    // Found a cycle - return the path from where the cycle starts
     const cycleStart = path.indexOf(task.id);
     return path.slice(cycleStart).concat(task.id);
   }
@@ -196,27 +215,26 @@ export function detectCircularDependency(
   visited.add(task.id);
   path.push(task.id);
 
+  const shortIdMap = idMap ?? buildShortIdMap(allTasks);
   const taskMap = new Map(allTasks.map(t => [t.id, t]));
 
-  // Check all tasks this one blocks (they depend on this one)
   for (const blockedId of task.blocks) {
-    const expandedId = expandShortTaskId(blockedId, allTasks);
+    const expandedId = resolveId(blockedId, shortIdMap);
     const blockedTask = expandedId ? taskMap.get(expandedId) : null;
 
     if (blockedTask) {
-      const cycle = detectCircularDependency(blockedTask, allTasks, new Set(visited), [...path]);
+      const cycle = detectCircularDependency(blockedTask, allTasks, new Set(visited), [...path], shortIdMap);
       if (cycle) return cycle;
     }
   }
 
-  // Also check tasks that have this task in their blockedBy
   for (const otherTask of allTasks) {
     if (otherTask.id === task.id) continue;
 
     for (const blockerId of otherTask.blockedBy) {
-      const expandedId = expandShortTaskId(blockerId, allTasks);
+      const expandedId = resolveId(blockerId, shortIdMap);
       if (expandedId === task.id) {
-        const cycle = detectCircularDependency(otherTask, allTasks, new Set(visited), [...path]);
+        const cycle = detectCircularDependency(otherTask, allTasks, new Set(visited), [...path], shortIdMap);
         if (cycle) return cycle;
       }
     }
@@ -251,6 +269,7 @@ export function getReadyTasks(allTasks: Task[]): Task[] {
  * Sort tasks by dependency order (tasks that block others come first)
  */
 export function sortByDependencyOrder(tasks: Task[], allTasks: Task[]): Task[] {
+  const shortIdMap = buildShortIdMap(allTasks);
   const taskMap = new Map(tasks.map(t => [t.id, t]));
   const sorted: Task[] = [];
   const visited = new Set<string>();
@@ -259,16 +278,15 @@ export function sortByDependencyOrder(tasks: Task[], allTasks: Task[]): Task[] {
     if (visited.has(task.id)) return;
     visited.add(task.id);
 
-    // First, visit all tasks that this one blocks
     for (const blockedId of task.blocks) {
-      const expandedId = expandShortTaskId(blockedId, allTasks);
+      const expandedId = resolveId(blockedId, shortIdMap);
       const blockedTask = expandedId ? taskMap.get(expandedId) : null;
       if (blockedTask) {
         visit(blockedTask);
       }
     }
 
-    sorted.unshift(task); // Add to front so blockers come first
+    sorted.unshift(task);
   }
 
   for (const task of tasks) {

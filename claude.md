@@ -1,10 +1,10 @@
 # Task Consolidator - Project Memory
 
-## Current Version: v3.0.0
+## Current Version: v4.0.0
 
 ## v4 Development Roadmap
 
-### Status: IN PROGRESS - P0 and P1 bugs fixed, continue with P2 or features
+### Status: COMPLETE - All P0/P1/P2 bugs fixed, all v4 features implemented
 
 ---
 
@@ -32,33 +32,33 @@
 
 | # | Issue | Area | Status |
 |---|-------|------|--------|
-| 11 | O(n²) dependency detection | Performance | TODO |
-| 12 | Calendar queries per cell (inefficient) | Performance | TODO |
-| 13 | Full DOM re-render on refresh | Performance | TODO |
-| 14 | Duplicate `openTaskInEditor()` code | Tech Debt | TODO |
-| 15 | Missing ARIA labels on calendar/kanban | Accessibility | TODO |
-| 16 | Color-only workload indicators | Accessibility | TODO |
-| 17 | Project dashboard not keyboard navigable | Accessibility | TODO |
+| 11 | O(n²) dependency detection | Performance | DONE |
+| 12 | Calendar queries per cell (inefficient) | Performance | DONE |
+| 13 | Full DOM re-render on refresh | Performance | DONE |
+| 14 | Duplicate `openTaskInEditor()` code | Tech Debt | DONE |
+| 15 | Missing ARIA labels on calendar/kanban | Accessibility | DONE |
+| 16 | Color-only workload indicators | Accessibility | DONE |
+| 17 | Project dashboard not keyboard navigable | Accessibility | DONE |
 
 ---
 
 ## New Features for v4
 
 ### Tier 1 - High Value Features
-1. **Task Templates** - Save/reuse task structures with variables
-2. **Time Tracking** - Estimates, logging, reports (`[estimate:2h]`)
-3. **Advanced Search & Saved Filters** - Operators like `owner:John due:thisweek`
-4. **Subtask Progress Indicators** - "3/5 complete" on parent tasks
+1. **Task Templates** - Save/reuse task structures with variables - DONE
+2. **Time Tracking** - Estimates, logging, reports (`[estimate:2h]`, `[logged:1h]`) - DONE
+3. **Advanced Search & Saved Filters** - Operators like `owner:John due:thisweek` - DONE
+4. **Subtask Progress Indicators** - "3/5 complete" on parent tasks - DONE
 
 ### Tier 2 - Nice to Have
-5. **Task Comments/Notes** - Add notes without modifying task line
-6. **Workspaces/Views** - Multiple saved view configurations
-7. **Analytics Dashboard** - Completion trends, velocity metrics
+5. **Task Comments/Notes** - Add notes without modifying task line - DONE
+6. **Workspaces/Views** - Multiple saved view configurations - DONE
+7. **Analytics Dashboard** - Completion trends, velocity metrics - DONE
 
 ### Tier 3 - Future Consideration
-8. **External Integrations** - CSV/JSON export, iCal feed
-9. **Mobile-Friendly Improvements** - Touch gestures, responsive views
-10. **Smart Suggestions** - AI-powered date/owner/priority recommendations
+8. **External Integrations** - CSV/JSON/iCal export - DONE
+9. **Mobile-Friendly Improvements** - Touch gestures, responsive views - DONE
+10. **Smart Suggestions** - Pattern-based owner/priority/tag recommendations - DONE
 
 ---
 
@@ -72,9 +72,9 @@ npm run dev      # Watch mode
 
 ### Key Files
 - `src/main.ts` - Plugin entry point
-- `src/core/` - TaskCache, TaskParser, TaskUpdater, NotificationService
-- `src/views/` - PanelView, KanbanModal, CalendarView, ProjectDashboard
-- `src/utils/` - Date, Text, Validation, Dependency, DailyNote utilities
+- `src/core/` - TaskCache, TaskParser, TaskUpdater, NotificationService, CommentService, SuggestionService
+- `src/views/` - PanelView, KanbanModal, CalendarView, ProjectDashboard, QuickAddModal, TemplateModal, TimeReportModal, ExportModal, WorkspaceModal, CommentModal, SavedFiltersModal
+- `src/utils/` - Date, Text, Validation, Dependency, DailyNote, Editor, SearchParser utilities
 - `src/types/` - TypeScript interfaces and constants
 
 ### Obsidian Vault Location
@@ -113,4 +113,25 @@ https://github.com/jamesnealon010687/obsidian-task-consolidator.git
 - Bug #9: Added keyboard-accessible move buttons (left/right stage) to kanban task cards alongside drag-drop
 - Bug #10: Added max size cap (500) on `lastNotifiedTasks` set to prevent unbounded memory growth
 
-**NEXT SESSION: Choose P2 issues or v4 features to implement.**
+### P2 Bug Fixes (2026-02-19)
+- Bug #11: Built `buildShortIdMap()` for O(1) dependency resolution instead of O(n) `expandShortTaskId()` per call
+- Bug #12: Added `buildTaskDateMap()` in CalendarView - pre-groups tasks by date once, O(1) lookups per cell
+- Bug #13: Split panelView `render()` so header/controls render once; `refresh()` only rebuilds task sections with scroll preservation
+- Bug #14: Extracted shared `openTaskInEditor()` to `utils/editorUtils.ts`, replaced duplicates in panelView, kanbanModal, calendarView
+- Bug #15: Added `role="grid"`, `role="gridcell"`, `aria-label` to calendar; `role="article"`, `aria-label` to kanban cards and metadata spans
+- Bug #16: Added numerical task count text alongside color heatmap in calendar cells, plus workload labels in aria-label
+- Bug #17: Added `tabindex="0"`, `role="button"`, `aria-pressed`, Enter/Space keydown handlers to project dashboard cards
+
+### v4 Features (2026-02-19)
+- Feature 1 (Templates): `TemplateModal` for CRUD, template selector in QuickAddModal, variable substitution via `VariablePromptModal`
+- Feature 2 (Time Tracking): `[estimate:Xh]`/`[logged:Xh]` parsing in taskParser, preservation in taskUpdater, display in panelView, `TimeReportModal` for reports
+- Feature 3 (Advanced Search): `parseSearchQuery()` in searchParser.ts with `owner:`, `project:`, `stage:`, `priority:`, `due:`, `tag:`/`#tag`, `file:` operators; saved filter chips in panelView
+- Feature 4 (Subtask Progress): `getSubtaskProgress()` utility, "X/Y" badge display in panelView, kanbanModal, calendarView
+- Feature 5 (Comments): `CommentService` with plugin data persistence, `CommentModal` for view/add/delete, comment count badges on tasks
+- Feature 6 (Workspaces): `Workspace` interface for saving view state, workspace selector dropdown in panelView, `WorkspaceModal` for management
+- Feature 7 (Analytics): New "Analytics" tab in ProjectDashboard with CSS bar charts for completion trends, velocity, owner breakdown, priority distribution
+- Feature 8 (Export): `ExportModal` with CSV, JSON, iCal format options; Blob URL downloads; filtered export support
+- Feature 9 (Mobile): CSS `@media (max-width: 768px)` responsive rules, stacked kanban, larger touch targets, collapsible filters
+- Feature 10 (Smart Suggestions): `SuggestionService` with frequency-based analysis, suggestion chips in QuickAddModal for owner/priority/tags
+
+**All v4 roadmap items complete. Build verified.**

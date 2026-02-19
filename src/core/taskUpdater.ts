@@ -242,6 +242,16 @@ export class TaskUpdater {
       taskLine += ' ' + tags.map(t => `#${t}`).join(' ');
     }
 
+    // Preserve estimate
+    if (task.estimate) {
+      taskLine += ` [estimate:${task.estimate}]`;
+    }
+
+    // Preserve time logged
+    if (task.timeLogged) {
+      taskLine += ` [logged:${task.timeLogged}]`;
+    }
+
     // Add completion date if newly completed
     if (completed && !task.completed) {
       const today = formatDateToISO(getToday());

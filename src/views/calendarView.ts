@@ -1,4 +1,4 @@
-import { Modal, App, Notice, MarkdownView } from 'obsidian';
+import { Modal, App, Notice } from 'obsidian';
 import type TaskConsolidatorPlugin from '../main';
 import { TaskCache } from '../core/taskCache';
 import { TaskUpdater } from '../core/taskUpdater';
@@ -15,6 +15,7 @@ import {
   isDueToday
 } from '../utils/dateUtils';
 import { getRelativeDateString } from '../utils/dateUtils';
+import { openTaskInEditor } from '../utils/editorUtils';
 
 // ========================================
 // Calendar View Types
@@ -49,6 +50,7 @@ export class CalendarModal extends Modal {
   private currentDate: Date;
   private selectedDate: string | null = null;
   private draggedTask: Task | null = null;
+  private taskDateMap: Map<string, Task[]> = new Map();
 
   constructor(app: App, plugin: TaskConsolidatorPlugin) {
     super(app);
@@ -72,9 +74,23 @@ export class CalendarModal extends Modal {
     this.contentEl.empty();
   }
 
+  private buildTaskDateMap(): void {
+    this.taskDateMap.clear();
+    for (const task of this.taskCache.getAllTasks()) {
+      if (task.dueDate) {
+        const existing = this.taskDateMap.get(task.dueDate);
+        if (existing) existing.push(task);
+        else this.taskDateMap.set(task.dueDate, [task]);
+      }
+    }
+  }
+
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
+
+    // Build date map once per render (P2 #12)
+    this.buildTaskDateMap();
 
     this.renderHeader(contentEl);
     this.renderViewToggle(contentEl);
@@ -218,18 +234,23 @@ export class CalendarModal extends Modal {
 
   private renderMonthView(container: HTMLElement): void {
     const calendar = container.createDiv({ cls: 'calendar-month' });
+    calendar.setAttribute('role', 'grid');
+    calendar.setAttribute('aria-label', 'Calendar month view');
 
     // Day headers
     const headerRow = calendar.createDiv({ cls: 'calendar-header-row' });
+    headerRow.setAttribute('role', 'row');
     const orderedDays = this.getOrderedDayNames();
     for (const day of orderedDays) {
-      headerRow.createDiv({ cls: 'calendar-header-cell', text: day });
+      const cell = headerRow.createDiv({ cls: 'calendar-header-cell', text: day });
+      cell.setAttribute('role', 'columnheader');
     }
 
     // Calendar grid
     const weeks = this.getMonthWeeks();
     for (const week of weeks) {
       const weekRow = calendar.createDiv({ cls: 'calendar-week-row' });
+      weekRow.setAttribute('role', 'row');
 
       for (const day of week.days) {
         this.renderMonthCell(weekRow, day);
@@ -242,9 +263,23 @@ export class CalendarModal extends Modal {
       cls: `calendar-cell ${day.isCurrentMonth ? '' : 'other-month'} ${day.isToday ? 'today' : ''} ${day.isWeekend ? 'weekend' : ''} ${this.selectedDate === day.dateStr ? 'selected' : ''}`
     });
 
+    // ARIA attributes (P2 #15)
+    cell.setAttribute('role', 'gridcell');
+    const taskCountLabel = day.tasks.length === 1 ? '1 task' : `${day.tasks.length} tasks`;
+    const workloadLevel = this.getWorkloadLabel(day.tasks.length);
+    cell.setAttribute('aria-label', `${day.dateStr}, ${taskCountLabel}${workloadLevel ? ', ' + workloadLevel : ''}`);
+
     // Date number
     const dateNum = cell.createDiv({ cls: 'calendar-date-num' });
     dateNum.setText(String(day.date.getDate()));
+
+    // Task count text (P2 #16 - supplement color-only indicators)
+    if (day.tasks.length > 0) {
+      cell.createDiv({
+        cls: 'calendar-task-count',
+        text: String(day.tasks.length)
+      });
+    }
 
     // Task indicators
     if (day.tasks.length > 0) {
@@ -292,6 +327,14 @@ export class CalendarModal extends Modal {
     if (taskCount <= 4) return 2;
     if (taskCount <= 6) return 3;
     return 4;
+  }
+
+  private getWorkloadLabel(taskCount: number): string {
+    if (taskCount === 0) return '';
+    if (taskCount <= 2) return 'Light workload';
+    if (taskCount <= 4) return 'Moderate workload';
+    if (taskCount <= 6) return 'Heavy workload';
+    return 'Very heavy workload';
   }
 
   // ========================================
@@ -429,7 +472,7 @@ export class CalendarModal extends Modal {
         text: `📄 ${task.file.basename}`
       }).addEventListener('click', (e) => {
         e.stopPropagation();
-        this.openTaskInEditor(task);
+        this.openTask(task);
       });
     }
 
@@ -447,7 +490,7 @@ export class CalendarModal extends Modal {
 
     // Click to open
     card.addEventListener('click', () => {
-      this.openTaskInEditor(task);
+      this.openTask(task);
     });
   }
 
@@ -600,31 +643,20 @@ export class CalendarModal extends Modal {
   }
 
   private getTasksForDate(dateStr: string): Task[] {
-    return this.taskCache.getAllTasks()
-      .filter(t => t.dueDate === dateStr)
-      .sort((a, b) => {
-        // Sort by priority, then completion
-        if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const aPriority = a.priority ? priorityOrder[a.priority] : 3;
-        const bPriority = b.priority ? priorityOrder[b.priority] : 3;
-        return aPriority - bPriority;
-      });
+    // Use pre-built map for O(1) lookup (P2 #12)
+    const tasks = this.taskDateMap.get(dateStr) ?? [];
+    return [...tasks].sort((a, b) => {
+      // Sort by priority, then completion
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      const aPriority = a.priority ? priorityOrder[a.priority] : 3;
+      const bPriority = b.priority ? priorityOrder[b.priority] : 3;
+      return aPriority - bPriority;
+    });
   }
 
-  private async openTaskInEditor(task: Task): Promise<void> {
-    await this.app.workspace.getLeaf(false).openFile(task.file);
-
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (view?.editor) {
-      const editor = view.editor;
-      editor.setCursor({ line: task.lineNumber, ch: 0 });
-      editor.scrollIntoView(
-        { from: { line: task.lineNumber, ch: 0 }, to: { line: task.lineNumber, ch: 0 } },
-        true
-      );
-    }
-
+  private async openTask(task: Task): Promise<void> {
+    await openTaskInEditor(this.app, task);
     this.close();
   }
 }

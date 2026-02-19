@@ -30,6 +30,7 @@ export class TaskConsolidatorSettingTab extends PluginSettingTab {
     this.renderQuickAddSection(containerEl);
     this.renderDailyNoteSection(containerEl);
     this.renderNotificationSection(containerEl);
+    this.renderFeaturesSection(containerEl);
     this.renderAdvancedSection(containerEl);
     this.renderResetSection(containerEl);
   }
@@ -557,6 +558,43 @@ export class TaskConsolidatorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.showNotificationBadge);
         toggle.onChange(async (value) => {
           this.plugin.settings.showNotificationBadge = value;
+          await this.plugin.saveSettings();
+        });
+      });
+  }
+
+  private renderFeaturesSection(container: HTMLElement): void {
+    container.createEl('h2', { text: 'Features' });
+
+    new Setting(container)
+      .setName('Enable Time Tracking')
+      .setDesc('Parse [estimate:2h] and [logged:1h30m] metadata from tasks')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.enableTimeTracking);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.enableTimeTracking = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Enable Comments')
+      .setDesc('Allow adding comments/notes to tasks')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.enableComments);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.enableComments = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Enable Smart Suggestions')
+      .setDesc('Show suggestions based on task patterns when adding tasks')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.enableSmartSuggestions);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.enableSmartSuggestions = value;
           await this.plugin.saveSettings();
         });
       });

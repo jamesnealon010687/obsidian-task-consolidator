@@ -6,12 +6,18 @@ import { TaskConsolidatorSettingTab } from './settings/settingsTab';
 import { TaskCache } from './core/taskCache';
 import { TaskUpdater } from './core/taskUpdater';
 import { NotificationService } from './core/notificationService';
+import { CommentService } from './core/commentService';
+import { SuggestionService } from './core/suggestionService';
 import { TaskPanelView } from './views/panelView';
 import { KanbanModal } from './views/kanbanModal';
 import { QuickAddModal } from './views/quickAddModal';
 import { CalendarModal } from './views/calendarView';
 import { ProjectDashboardModal } from './views/projectDashboard';
 import { TaskAgentModal } from './views/taskAgentModal';
+import { TemplateModal } from './views/templateModal';
+import { TimeReportModal } from './views/timeReportModal';
+import { ExportModal } from './views/exportModal';
+import { WorkspaceModal } from './views/workspaceModal';
 import { ensureDailyNoteExists, getToday, getTodaysDailyNotePath } from './utils';
 
 // ========================================
@@ -23,6 +29,8 @@ export default class TaskConsolidatorPlugin extends Plugin {
   taskCache!: TaskCache;
   taskUpdater!: TaskUpdater;
   notificationService!: NotificationService;
+  commentService!: CommentService;
+  suggestionService!: SuggestionService;
 
   private fileWatcherRegistered = false;
   private debouncedRefresh = debounce(
@@ -42,6 +50,11 @@ export default class TaskConsolidatorPlugin extends Plugin {
     this.taskCache = new TaskCache(this.app, this.settings);
     this.taskUpdater = new TaskUpdater(this.app, this.settings);
     this.notificationService = new NotificationService(this.app, this.settings);
+    this.commentService = new CommentService(
+      () => this.loadData(),
+      (data: any) => this.saveData(data)
+    );
+    this.suggestionService = new SuggestionService(this.taskCache);
 
     // Register view
     this.registerView(TASK_VIEW_TYPE, (leaf) => new TaskPanelView(leaf, this));
@@ -132,11 +145,48 @@ export default class TaskConsolidatorPlugin extends Plugin {
       }
     });
 
+    this.addCommand({
+      id: 'open-template-manager',
+      name: 'Open Task Template Manager',
+      callback: () => {
+        new TemplateModal(this.app, this).open();
+      }
+    });
+
+    this.addCommand({
+      id: 'export-tasks',
+      name: 'Export Tasks',
+      callback: () => {
+        new ExportModal(this.app, this).open();
+      }
+    });
+
+    this.addCommand({
+      id: 'open-time-report',
+      name: 'Open Time Report',
+      callback: () => {
+        new TimeReportModal(this.app, this).open();
+      }
+    });
+
+    this.addCommand({
+      id: 'open-workspace-manager',
+      name: 'Manage Workspaces',
+      callback: () => {
+        new WorkspaceModal(this.app, this).open();
+      }
+    });
+
     // Add settings tab
     this.addSettingTab(new TaskConsolidatorSettingTab(this.app, this));
 
     // Initialize task cache
     await this.taskCache.initialize();
+
+    // Initialize comment service
+    if (this.settings.enableComments) {
+      await this.commentService.initialize();
+    }
 
     // Setup file watchers
     this.setupFileWatchers();

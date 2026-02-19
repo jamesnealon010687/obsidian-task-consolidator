@@ -78,7 +78,26 @@ export const DEFAULT_SETTINGS: TaskConsolidatorSettings = {
   upcomingDays: 3,
   reminderCheckIntervalMinutes: 30,
   showNotificationBadge: true,
-  lastNotificationCheck: 0
+  lastNotificationCheck: 0,
+
+  // Time Tracking
+  enableTimeTracking: true,
+
+  // Task Templates
+  taskTemplates: [],
+
+  // Saved Filters
+  savedFilters: [],
+
+  // Comments
+  enableComments: true,
+
+  // Workspaces
+  workspaces: [],
+  activeWorkspaceId: '',
+
+  // Smart Suggestions
+  enableSmartSuggestions: true
 };
 
 // ========================================
@@ -93,6 +112,9 @@ export function mergeSettings(loaded: Partial<TaskConsolidatorSettings>): TaskCo
     excludedFolders: loaded.excludedFolders ?? DEFAULT_SETTINGS.excludedFolders,
     excludedPatterns: loaded.excludedPatterns ?? DEFAULT_SETTINGS.excludedPatterns,
     filterTags: loaded.filterTags ?? DEFAULT_SETTINGS.filterTags,
-    collapsedGroups: loaded.collapsedGroups ?? DEFAULT_SETTINGS.collapsedGroups
+    collapsedGroups: loaded.collapsedGroups ?? DEFAULT_SETTINGS.collapsedGroups,
+    taskTemplates: loaded.taskTemplates ?? DEFAULT_SETTINGS.taskTemplates,
+    savedFilters: loaded.savedFilters ?? DEFAULT_SETTINGS.savedFilters,
+    workspaces: loaded.workspaces ?? DEFAULT_SETTINGS.workspaces
   };
 }

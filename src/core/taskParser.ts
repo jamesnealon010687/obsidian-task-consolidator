@@ -97,7 +97,9 @@ export function parseMetadataString(
     completedDate: null,
     createdDate: null,
     blockedBy: [],
-    blocks: []
+    blocks: [],
+    estimate: null,
+    timeLogged: null
   };
 
   const allStages = [...STAGES, ...customStages];
@@ -168,7 +170,7 @@ export function parseMetadataString(
  */
 export function extractInlineMetadata(text: string): { cleanText: string; metadata: Partial<ParsedMetadata> } {
   let cleanText = text;
-  const metadata: Partial<ParsedMetadata> = { tags: [], blockedBy: [], blocks: [] };
+  const metadata: Partial<ParsedMetadata> = { tags: [], blockedBy: [], blocks: [], estimate: null, timeLogged: null };
 
   // Extract completed date
   const completedMatch = cleanText.match(PATTERNS.COMPLETED_DATE);
@@ -218,6 +220,20 @@ export function extractInlineMetadata(text: string): { cleanText: string; metada
     }
   }
   cleanText = cleanText.replace(PATTERNS.BLOCKS, '').trim();
+
+  // Extract estimate
+  const estimateMatch = cleanText.match(PATTERNS.ESTIMATE);
+  if (estimateMatch) {
+    metadata.estimate = estimateMatch[1].trim();
+    cleanText = cleanText.replace(PATTERNS.ESTIMATE, '').trim();
+  }
+
+  // Extract time logged
+  const loggedMatch = cleanText.match(PATTERNS.TIME_LOGGED);
+  if (loggedMatch) {
+    metadata.timeLogged = loggedMatch[1].trim();
+    cleanText = cleanText.replace(PATTERNS.TIME_LOGGED, '').trim();
+  }
 
   // Extract tags
   const tagMatches = cleanText.matchAll(PATTERNS.TAGS);
@@ -271,7 +287,9 @@ export function parseTaskLine(
     completedDate: inlineMetadata.completedDate ?? null,
     createdDate: inlineMetadata.createdDate ?? null,
     blockedBy: inlineMetadata.blockedBy ?? [],
-    blocks: inlineMetadata.blocks ?? []
+    blocks: inlineMetadata.blocks ?? [],
+    estimate: inlineMetadata.estimate ?? null,
+    timeLogged: inlineMetadata.timeLogged ?? null
   };
 
   let displayText = taskContent;
@@ -318,7 +336,9 @@ export function parseTaskLine(
     indent,
     createdDate: taskData.createdDate,
     blockedBy: taskData.blockedBy,
-    blocks: taskData.blocks
+    blocks: taskData.blocks,
+    estimate: taskData.estimate ?? inlineMetadata.estimate ?? null,
+    timeLogged: taskData.timeLogged ?? inlineMetadata.timeLogged ?? null
   };
 }
 

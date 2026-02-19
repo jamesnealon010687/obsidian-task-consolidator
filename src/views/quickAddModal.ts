@@ -2,11 +2,12 @@ import { Modal, App, TFile, Setting, Notice } from 'obsidian';
 import type TaskConsolidatorPlugin from '../main';
 import { TaskCache } from '../core/taskCache';
 import { TaskUpdater } from '../core/taskUpdater';
-import { TaskConsolidatorSettings, Priority } from '../types';
+import { TaskConsolidatorSettings, Priority, TaskTemplate } from '../types';
 import { STAGES, PRIORITIES, QUICK_ADD_PATTERNS } from '../types/constants';
 import { parseNaturalDate, getToday } from '../utils/dateUtils';
 import { validateTaskText } from '../utils/validation';
 import { ensureDailyNoteExists, addTaskToDailyNote } from '../utils/dailyNoteUtils';
+import { VariablePromptModal } from './templateModal';
 
 // ========================================
 // Quick Add Modal Options
@@ -78,6 +79,24 @@ export class QuickAddModal extends Modal {
     const title = this.targetDailyNote ? 'Add Task to Daily Note' : 'Quick Add Task';
     contentEl.createEl('h2', { text: title });
 
+    // Template selector (Feature 1)
+    const templates = this.plugin.settings.taskTemplates;
+    if (templates.length > 0) {
+      new Setting(contentEl)
+        .setName('From Template')
+        .addDropdown(dd => {
+          dd.addOption('', 'None');
+          for (const tmpl of templates) {
+            dd.addOption(tmpl.id, tmpl.name);
+          }
+          dd.onChange(async (val) => {
+            if (!val) return;
+            const tmpl = templates.find(t => t.id === val);
+            if (tmpl) await this.applyTemplate(tmpl);
+          });
+        });
+    }
+
     // Quick syntax toggle
     new Setting(contentEl)
       .setName('Quick Syntax Mode')
@@ -106,6 +125,27 @@ export class QuickAddModal extends Modal {
         this.updatePreview();
       }
     });
+
+    // Smart suggestion chips (Feature 10)
+    if (this.plugin.settings.enableSmartSuggestions) {
+      const suggestions = this.plugin.suggestionService.getSuggestionsForContext(this.selectedProject || undefined);
+      const chipContainer = inputContainer.createDiv({ cls: 'suggestion-chips' });
+
+      if (suggestions.owners.length > 0 && !this.selectedOwner) {
+        for (const s of suggestions.owners.slice(0, 3)) {
+          chipContainer.createEl('button', { text: `👤 ${s.value}`, cls: 'suggestion-chip' })
+            .addEventListener('click', () => { this.selectedOwner = s.value; this.render(); });
+        }
+      }
+      if (suggestions.tags.length > 0) {
+        for (const s of suggestions.tags.slice(0, 3)) {
+          if (!this.selectedTags.includes(s.value)) {
+            chipContainer.createEl('button', { text: `#${s.value}`, cls: 'suggestion-chip' })
+              .addEventListener('click', () => { this.selectedTags.push(s.value); this.render(); });
+          }
+        }
+      }
+    }
 
     // Focus textarea
     setTimeout(() => textarea.focus(), 50);
@@ -348,6 +388,29 @@ export class QuickAddModal extends Modal {
     }
 
     preview.createSpan({ text: parts.join(' | ') || 'Enter task text...' });
+  }
+
+  private async applyTemplate(tmpl: TaskTemplate): Promise<void> {
+    let text = tmpl.text;
+
+    // If template has variables, prompt user for values
+    if (tmpl.variables.length > 0) {
+      const values = await new Promise<Record<string, string> | null>(resolve => {
+        new VariablePromptModal(this.app, tmpl.variables, resolve).open();
+      });
+      if (!values) return;
+      for (const [key, val] of Object.entries(values)) {
+        text = text.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), val);
+      }
+    }
+
+    this.taskText = text;
+    if (tmpl.owner) this.selectedOwner = tmpl.owner;
+    if (tmpl.project) this.selectedProject = tmpl.project;
+    if (tmpl.stage) this.selectedStage = tmpl.stage;
+    if (tmpl.priority) this.selectedPriority = tmpl.priority;
+    if (tmpl.tags.length > 0) this.selectedTags = [...tmpl.tags];
+    this.render();
   }
 
   private async createTask(): Promise<void> {
