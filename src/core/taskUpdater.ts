@@ -1,4 +1,4 @@
-import { App, TFile, Notice } from 'obsidian';
+import { App, TFile, Notice, Modal, ButtonComponent } from 'obsidian';
 import {
   Task,
   TaskConsolidatorSettings,
@@ -19,6 +19,52 @@ import {
 } from '../utils/validation';
 import { sanitizeOwner, sanitizeProject, sanitizeTaskText } from '../utils/textUtils';
 import { formatDateToISO, getToday, addDays, addWeeks, addMonths, addYears } from '../utils/dateUtils';
+
+// ========================================
+// Confirm Delete Modal
+// ========================================
+
+class ConfirmDeleteModal extends Modal {
+  private taskText: string;
+  private resolve: (confirmed: boolean) => void;
+  private resolved = false;
+
+  constructor(app: App, taskText: string, resolve: (confirmed: boolean) => void) {
+    super(app);
+    this.taskText = taskText;
+    this.resolve = resolve;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.createEl('h3', { text: 'Delete Task?' });
+    contentEl.createEl('p', { text: this.taskText });
+
+    const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
+    new ButtonComponent(buttonContainer)
+      .setButtonText('Cancel')
+      .onClick(() => {
+        this.resolved = true;
+        this.resolve(false);
+        this.close();
+      });
+    new ButtonComponent(buttonContainer)
+      .setButtonText('Delete')
+      .setWarning()
+      .onClick(() => {
+        this.resolved = true;
+        this.resolve(true);
+        this.close();
+      });
+  }
+
+  onClose(): void {
+    if (!this.resolved) {
+      this.resolve(false);
+    }
+    this.contentEl.empty();
+  }
+}
 
 // ========================================
 // Task Updater Class
@@ -289,6 +335,9 @@ export class TaskUpdater {
       const lines = content.split('\n');
 
       const insertAt = options.atLine ?? lines.length;
+      if (insertAt < 0 || insertAt > lines.length) {
+        return { success: false, error: `Line number ${insertAt} is out of range (0-${lines.length})` };
+      }
       lines.splice(insertAt, 0, fullLine);
 
       const newContent = lines.join('\n');
@@ -304,10 +353,23 @@ export class TaskUpdater {
   }
 
   /**
+   * Prompt user to confirm task deletion
+   */
+  private confirmDelete(task: Task): Promise<boolean> {
+    return new Promise((resolve) => {
+      new ConfirmDeleteModal(this.app, task.text, resolve).open();
+    });
+  }
+
+  /**
    * Delete a task
    */
   async deleteTask(task: Task): Promise<TaskUpdateResult> {
     try {
+      if (this.settings.confirmDestructiveActions) {
+        const confirmed = await this.confirmDelete(task);
+        if (!confirmed) return { success: false, error: 'Delete cancelled' };
+      }
       const content = await this.app.vault.read(task.file);
       const lines = content.split('\n');
 

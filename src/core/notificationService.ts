@@ -20,6 +20,8 @@ export class NotificationService {
   private settings: TaskConsolidatorSettings;
   private checkInterval: number | null = null;
   private lastNotifiedTasks: Set<string> = new Set();
+  private getTasksFn: (() => Task[]) | null = null;
+  private readonly maxNotifiedTasksSize = 500;
 
   constructor(app: App, settings: TaskConsolidatorSettings) {
     this.app = app;
@@ -37,18 +39,20 @@ export class NotificationService {
   /**
    * Start the notification check interval
    */
-  startCheckInterval(): void {
-    if (!this.settings.enableNotifications) return;
-
-    // Clear existing interval
+  startCheckInterval(getTasksFn: () => Task[]): void {
     this.stopCheckInterval();
+    if (!this.settings.enableNotifications) return;
 
     // Convert minutes to milliseconds
     const intervalMs = this.settings.reminderCheckIntervalMinutes * 60 * 1000;
+    if (intervalMs <= 0) return;
+
+    // Store callback for restartCheckInterval
+    this.getTasksFn = getTasksFn;
 
     // Start new interval
     this.checkInterval = window.setInterval(() => {
-      // This will be called by the main plugin
+      this.checkAndNotify(getTasksFn());
     }, intervalMs);
 
     if (this.settings.debugMode) {
@@ -70,8 +74,9 @@ export class NotificationService {
    * Restart the check interval (after settings change)
    */
   restartCheckInterval(): void {
-    this.stopCheckInterval();
-    this.startCheckInterval();
+    if (this.getTasksFn) {
+      this.startCheckInterval(this.getTasksFn);
+    }
   }
 
   /**
@@ -148,6 +153,11 @@ export class NotificationService {
     // Don't notify for the same task twice in short period
     if (this.lastNotifiedTasks.has(task.id)) return;
 
+    // Prevent unbounded growth
+    if (this.lastNotifiedTasks.size >= this.maxNotifiedTasksSize) {
+      this.lastNotifiedTasks.clear();
+    }
+
     this.lastNotifiedTasks.add(task.id);
 
     // Clear from set after 5 minutes
@@ -194,6 +204,7 @@ export class NotificationService {
 
     if (parts.length > 0) {
       new Notice(`Reminder: ${parts.join(', ')}`, 6000);
+      this.settings.lastNotificationCheck = Date.now();
     }
   }
 

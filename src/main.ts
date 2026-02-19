@@ -25,7 +25,6 @@ export default class TaskConsolidatorPlugin extends Plugin {
   notificationService!: NotificationService;
 
   private fileWatcherRegistered = false;
-  private notificationCheckInterval: number | null = null;
   private debouncedRefresh = debounce(
     async () => {
       await this.refreshTasks();
@@ -156,11 +155,6 @@ export default class TaskConsolidatorPlugin extends Plugin {
     this.app.workspace.detachLeavesOfType(TASK_VIEW_TYPE);
     this.taskCache.clear();
     this.notificationService.destroy();
-
-    if (this.notificationCheckInterval) {
-      window.clearInterval(this.notificationCheckInterval);
-      this.notificationCheckInterval = null;
-    }
 
     if (this.settings.debugMode) {
       console.log('Task Consolidator unloaded');
@@ -325,13 +319,10 @@ export default class TaskConsolidatorPlugin extends Plugin {
   }
 
   private setupNotifications(): void {
-    // Clear existing interval
-    if (this.notificationCheckInterval) {
-      window.clearInterval(this.notificationCheckInterval);
-      this.notificationCheckInterval = null;
+    if (!this.settings.enableNotifications) {
+      this.notificationService.stopCheckInterval();
+      return;
     }
-
-    if (!this.settings.enableNotifications) return;
 
     // Show startup notification (delayed to ensure cache is loaded)
     if (this.settings.notifyOnStartup) {
@@ -342,19 +333,8 @@ export default class TaskConsolidatorPlugin extends Plugin {
       }, 2000);
     }
 
-    // Setup periodic check
-    if (this.settings.reminderCheckIntervalMinutes > 0) {
-      const intervalMs = this.settings.reminderCheckIntervalMinutes * 60 * 1000;
-
-      this.notificationCheckInterval = window.setInterval(() => {
-        const allTasks = this.taskCache.getFilteredTasks({});
-        this.notificationService.checkAndNotify(allTasks);
-      }, intervalMs);
-
-      if (this.settings.debugMode) {
-        console.log(`Notification check interval set: ${this.settings.reminderCheckIntervalMinutes} minutes`);
-      }
-    }
+    // Setup periodic check via the notification service
+    this.notificationService.startCheckInterval(() => this.taskCache.getFilteredTasks({}));
   }
 
   showTaskSummary(): void {

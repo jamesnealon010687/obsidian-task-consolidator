@@ -4,7 +4,7 @@
 
 ## v4 Development Roadmap
 
-### Status: PENDING - Resume development here
+### Status: IN PROGRESS - P0 and P1 bugs fixed, continue with P2 or features
 
 ---
 
@@ -12,21 +12,21 @@
 
 | # | Bug | File:Line | Impact | Status |
 |---|-----|-----------|--------|--------|
-| 1 | Empty notification interval callback - reminders never fire | notificationService.ts:50 | Reminders broken | TODO |
-| 2 | No bounds check on task insertion line number | taskUpdater.ts:291 | File corruption risk | TODO |
-| 3 | No delete confirmation dialogs | taskUpdater.ts:309 | Data loss risk | TODO |
-| 4 | JSON.parse without try-catch in kanban drag | kanbanModal.ts:250 | Crash on drag | TODO |
-| 5 | `lastNotificationCheck` never updated | notificationService.ts:180 | Timing broken | TODO |
+| 1 | Empty notification interval callback - reminders never fire | notificationService.ts:50 | Reminders broken | DONE |
+| 2 | No bounds check on task insertion line number | taskUpdater.ts:291 | File corruption risk | DONE |
+| 3 | No delete confirmation dialogs | taskUpdater.ts:309 | Data loss risk | DONE |
+| 4 | JSON.parse without try-catch in kanban drag | kanbanModal.ts:250 | Crash on drag | DONE |
+| 5 | `lastNotificationCheck` never updated | notificationService.ts:180 | Timing broken | DONE |
 
 ## High Priority Bugs (P1) - DO SECOND
 
 | # | Bug | File:Line | Impact | Status |
 |---|-----|-----------|--------|--------|
-| 6 | Cache refresh loop stops on first error | taskCache.ts:143 | Partial refresh | TODO |
-| 7 | Windows path normalization in exclusions | taskCache.ts:174 | Exclusions fail on Windows | TODO |
-| 8 | Date parsing fallback assigns invalid dates | quickAddModal.ts:201 | Bad task data | TODO |
-| 9 | Kanban drag-drop has no keyboard alternative | kanbanModal.ts | Accessibility gap | TODO |
-| 10 | Unbounded `lastNotifiedTasks` set | notificationService.ts:22 | Memory leak | TODO |
+| 6 | Cache refresh loop stops on first error | taskCache.ts:143 | Partial refresh | DONE |
+| 7 | Windows path normalization in exclusions | taskCache.ts:174 | Exclusions fail on Windows | DONE |
+| 8 | Date parsing fallback assigns invalid dates | quickAddModal.ts:201 | Bad task data | DONE |
+| 9 | Kanban drag-drop has no keyboard alternative | kanbanModal.ts | Accessibility gap | DONE |
+| 10 | Unbounded `lastNotifiedTasks` set | notificationService.ts:22 | Memory leak | DONE |
 
 ## Medium Priority Issues (P2)
 
@@ -98,4 +98,19 @@ https://github.com/jamesnealon010687/obsidian-task-consolidator.git
 
 ---
 
-**NEXT SESSION: Start with P0 bug fixes, then P1, then choose features to implement.**
+### P0 Bug Fixes (2026-02-19)
+- Bug #1: Fixed empty `startCheckInterval()` callback - service now owns the interval with task-fetching callback
+- Bug #2: Added bounds check on `atLine` in `createTask()` - rejects out-of-range values
+- Bug #3: Added `ConfirmDeleteModal` and confirmation check in `deleteTask()` when `confirmDestructiveActions` is true
+- Bug #4: Already fixed (kanban try-catch existed)
+- Bug #5: `lastNotificationCheck` now updated after sending notifications in `checkAndNotify()`
+- Removed duplicate notification interval from `main.ts` - consolidated into `NotificationService`
+
+### P1 Bug Fixes (2026-02-19)
+- Bug #6: Added try-catch around per-file parsing in `refreshAll()` so one bad file doesn't stop the entire cache refresh
+- Bug #7: Normalized backslashes to forward slashes in `shouldParseFile()` exclusion checks for Windows compatibility
+- Bug #8: Date parsing fallback no longer assigns raw invalid text - only sets date when `parseNaturalDate` returns a valid result
+- Bug #9: Added keyboard-accessible move buttons (left/right stage) to kanban task cards alongside drag-drop
+- Bug #10: Added max size cap (500) on `lastNotifiedTasks` set to prevent unbounded memory growth
+
+**NEXT SESSION: Choose P2 issues or v4 features to implement.**

@@ -154,12 +154,16 @@ export class TaskCache {
 
       this.stats.misses++;
 
-      const entry: CacheEntry = {
-        tasks: await parseTasksFromFile(this.app, file, this.settings),
-        lastModified: file.stat.mtime
-      };
+      try {
+        const entry: CacheEntry = {
+          tasks: await parseTasksFromFile(this.app, file, this.settings),
+          lastModified: file.stat.mtime
+        };
 
-      this.cache.set(file.path, entry);
+        this.cache.set(file.path, entry);
+      } catch (error) {
+        console.error(`Task Consolidator: Error parsing file ${file.path}:`, error);
+      }
     }
 
     this.rebuildAllTasks();
@@ -177,16 +181,18 @@ export class TaskCache {
 
     const folderPath = file.parent?.path ?? '';
 
-    // Check excluded folders
+    // Check excluded folders (normalize backslashes for Windows compatibility)
     for (const excluded of this.settings.excludedFolders) {
-      if (folderPath === excluded || folderPath.startsWith(`${excluded}/`)) {
+      const normalizedExcluded = excluded.replace(/\\/g, '/');
+      if (folderPath === normalizedExcluded || folderPath.startsWith(`${normalizedExcluded}/`)) {
         return false;
       }
     }
 
-    // Check excluded patterns
+    // Check excluded patterns (normalize backslashes for Windows compatibility)
     for (const pattern of this.settings.excludedPatterns) {
-      if (this.matchGlob(file.path, pattern)) {
+      const normalizedPattern = pattern.replace(/\\/g, '/');
+      if (this.matchGlob(file.path, normalizedPattern)) {
         return false;
       }
     }

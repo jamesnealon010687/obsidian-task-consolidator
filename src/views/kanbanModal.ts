@@ -202,6 +202,36 @@ export class KanbanModal extends Modal {
       this.openTaskInEditor(task);
     });
 
+    // Keyboard-accessible move buttons
+    const actions = card.createDiv({ cls: 'kanban-card-actions' });
+    const currentIndex = KANBAN_COLUMNS.findIndex(c => c.stage === (task.stage ?? null));
+
+    if (currentIndex > 0) {
+      const prevStage = KANBAN_COLUMNS[currentIndex - 1];
+      const moveLeftBtn = actions.createEl('button', {
+        cls: 'kanban-move-btn',
+        text: `← ${prevStage.title}`,
+        attr: { 'aria-label': `Move to ${prevStage.title}` }
+      });
+      moveLeftBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.moveTaskToStage(task, prevStage.stage);
+      });
+    }
+
+    if (currentIndex < KANBAN_COLUMNS.length - 1) {
+      const nextStage = KANBAN_COLUMNS[currentIndex + 1];
+      const moveRightBtn = actions.createEl('button', {
+        cls: 'kanban-move-btn',
+        text: `${nextStage.title} →`,
+        attr: { 'aria-label': `Move to ${nextStage.title}` }
+      });
+      moveRightBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.moveTaskToStage(task, nextStage.stage);
+      });
+    }
+
     // Setup drag events
     this.setupDragEvents(card, task);
   }
@@ -269,6 +299,17 @@ export class KanbanModal extends Modal {
         new Notice('Error moving task');
       }
     });
+  }
+
+  private async moveTaskToStage(task: Task, stage: Stage | null): Promise<void> {
+    const result = await this.taskUpdater.updateTaskStage(task, stage);
+    if (result.success) {
+      new Notice(`Task moved to ${stage ?? 'Unassigned'}`);
+      await this.plugin.refreshTasks();
+      this.refreshBoard();
+    } else {
+      new Notice(`Error: ${result.error}`);
+    }
   }
 
   private refreshBoard(): void {

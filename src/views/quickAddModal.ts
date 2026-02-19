@@ -198,8 +198,14 @@ export class QuickAddModal extends Modal {
           .setPlaceholder('YYYY-MM-DD or "tomorrow"')
           .setValue(this.selectedDueDate)
           .onChange(value => {
+            if (!value.trim()) {
+              this.selectedDueDate = '';
+              return;
+            }
             const parsed = parseNaturalDate(value);
-            this.selectedDueDate = parsed ?? value;
+            if (parsed) {
+              this.selectedDueDate = parsed;
+            }
           })
       );
 
