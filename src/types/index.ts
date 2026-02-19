@@ -50,6 +50,9 @@ export interface Task {
   children: Task[];
   depth: number;
   indent: string;
+  // Dependencies
+  blockedBy: string[];  // Task IDs this task is blocked by
+  blocks: string[];     // Task IDs this task blocks
 }
 
 // ========================================
@@ -112,6 +115,25 @@ export interface TaskConsolidatorSettings {
   maxTasksToRender: number;
   enableVirtualScrolling: boolean;
   enableTaskCache: boolean;
+
+  // Daily Note Integration
+  enableDailyNoteIntegration: boolean;
+  dailyNoteFolder: string;
+  dailyNoteDateFormat: string;
+  dailyNoteTasksHeading: string;
+  autoLinkTasksToDailyNote: boolean;
+  showDailyNoteButton: boolean;
+
+  // Notifications and Reminders
+  enableNotifications: boolean;
+  notifyOnStartup: boolean;
+  notifyOverdueTasks: boolean;
+  notifyDueToday: boolean;
+  notifyUpcoming: boolean;
+  upcomingDays: number;
+  reminderCheckIntervalMinutes: number;
+  showNotificationBadge: boolean;
+  lastNotificationCheck: number;
 }
 
 // ========================================
@@ -241,6 +263,8 @@ export interface ParsedMetadata {
   recurrence: Recurrence | null;
   completedDate: string | null;
   createdDate: string | null;
+  blockedBy: string[];
+  blocks: string[];
 }
 
 // ========================================
@@ -264,4 +288,27 @@ export interface TaskCreateOptions {
 export interface KeyboardShortcut {
   shortcut: string;
   description: string;
+}
+
+// ========================================
+// Task Dependency Types
+// ========================================
+
+export interface TaskDependency {
+  taskId: string;
+  type: 'blocks' | 'blockedBy';
+}
+
+export interface DependencyLink {
+  sourceId: string;
+  targetId: string;
+  type: 'blocks' | 'blockedBy';
+}
+
+export interface DependencyStatus {
+  isBlocked: boolean;
+  blockedByCount: number;
+  blocksCount: number;
+  blockedByTasks: string[];
+  blocksTasks: string[];
 }

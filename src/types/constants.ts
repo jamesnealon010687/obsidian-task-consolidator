@@ -191,7 +191,10 @@ export const PATTERNS = {
   TAGS: /#([\w\-_]+)/g,
   QUICK_OWNER: /@([\w\s\-.']+?)(?=\s+[#!@]|\s*$)/,
   QUICK_PROJECT: /^#([\w\-_]+)/,
-  QUICK_DATE: /!([\w\-/]+)/
+  QUICK_DATE: /!([\w\-/]+)/,
+  // Dependency patterns: [blocked-by:task-id] or [blocks:task-id]
+  BLOCKED_BY: /\[blocked-by:([^\]]+)\]/gi,
+  BLOCKS: /\[blocks:([^\]]+)\]/gi
 };
 
 // ========================================

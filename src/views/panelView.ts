@@ -7,6 +7,7 @@ import { TASK_VIEW_TYPE, SORT_OPTIONS, GROUP_OPTIONS, STAGES, KEYS, PRIORITY_ICO
 import { isOverdue, isDueToday, getRelativeDateString } from '../utils/dateUtils';
 import { compareNullableStrings } from '../utils/textUtils';
 import { formatLabel } from '../utils/textUtils';
+import { getDependencyStatus, createShortTaskId } from '../utils/dependencyUtils';
 import { KeyboardNavigationHandler, announceToScreenReader } from './keyboardNav';
 import { KeyboardHelpModal } from './keyboardHelpModal';
 
@@ -41,7 +42,7 @@ export class TaskPanelView extends ItemView {
   }
 
   getIcon(): string {
-    return 'checkmark';
+    return 'list-checks';
   }
 
   async onOpen(): Promise<void> {
@@ -219,6 +220,35 @@ export class TaskPanelView extends ItemView {
       attr: { 'aria-label': 'Open Kanban board' }
     }).addEventListener('click', () => {
       this.plugin.openKanban();
+    });
+
+    // Calendar button
+    controls.createEl('button', {
+      text: 'Calendar',
+      cls: 'calendar-btn',
+      attr: { 'aria-label': 'Open Calendar view' }
+    }).addEventListener('click', () => {
+      this.plugin.openCalendar();
+    });
+
+    // Daily Note button (conditional)
+    if (this.plugin.settings.enableDailyNoteIntegration && this.plugin.settings.showDailyNoteButton) {
+      controls.createEl('button', {
+        text: 'Daily Note',
+        cls: 'daily-note-btn',
+        attr: { 'aria-label': 'Open today\'s daily note' }
+      }).addEventListener('click', () => {
+        this.plugin.openDailyNote();
+      });
+    }
+
+    // Dashboard button
+    controls.createEl('button', {
+      text: 'Dashboard',
+      cls: 'dashboard-btn',
+      attr: { 'aria-label': 'Open Project Dashboard' }
+    }).addEventListener('click', () => {
+      this.plugin.openProjectDashboard();
     });
 
     // Help button
@@ -673,6 +703,30 @@ export class TaskPanelView extends ItemView {
         text: '🔄',
         cls: 'task-recurring',
         attr: { title: 'Recurring task' }
+      });
+    }
+
+    // Dependency status
+    const allTasks = this.taskCache.getFilteredTasks({});
+    const depStatus = getDependencyStatus(task, allTasks);
+
+    if (depStatus.isBlocked) {
+      const blockerNames = depStatus.blockedByTasks.map(id => createShortTaskId(id)).join(', ');
+      item.addClass('task-blocked');
+      meta.createSpan({
+        text: `🚫 Blocked (${depStatus.blockedByCount})`,
+        cls: 'task-dependency task-blocked-indicator',
+        attr: { title: `Blocked by: ${blockerNames}` }
+      });
+    }
+
+    if (depStatus.blocksCount > 0 && !task.completed) {
+      const blockedNames = depStatus.blocksTasks.map(id => createShortTaskId(id)).join(', ');
+      item.addClass('task-blocker');
+      meta.createSpan({
+        text: `⏳ Blocks (${depStatus.blocksCount})`,
+        cls: 'task-dependency task-blocker-indicator',
+        attr: { title: `Blocks: ${blockedNames}` }
       });
     }
 

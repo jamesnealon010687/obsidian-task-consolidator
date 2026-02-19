@@ -28,6 +28,8 @@ export class TaskConsolidatorSettingTab extends PluginSettingTab {
     this.renderRecurringSection(containerEl);
     this.renderAppearanceSection(containerEl);
     this.renderQuickAddSection(containerEl);
+    this.renderDailyNoteSection(containerEl);
+    this.renderNotificationSection(containerEl);
     this.renderAdvancedSection(containerEl);
     this.renderResetSection(containerEl);
   }
@@ -386,6 +388,175 @@ export class TaskConsolidatorSettingTab extends PluginSettingTab {
         text.setPlaceholder('Project name');
         text.onChange(async (value) => {
           this.plugin.settings.defaultProject = value;
+          await this.plugin.saveSettings();
+        });
+      });
+  }
+
+  private renderDailyNoteSection(container: HTMLElement): void {
+    container.createEl('h2', { text: 'Daily Notes' });
+
+    new Setting(container)
+      .setName('Enable Daily Note Integration')
+      .setDesc('Allow tasks to be linked to and created in daily notes')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.enableDailyNoteIntegration);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.enableDailyNoteIntegration = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Daily Notes Folder')
+      .setDesc('Folder where daily notes are stored (leave empty for vault root)')
+      .addText(text => {
+        text.setValue(this.plugin.settings.dailyNoteFolder);
+        text.setPlaceholder('Daily Notes');
+        text.onChange(async (value) => {
+          this.plugin.settings.dailyNoteFolder = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Daily Note Date Format')
+      .setDesc('Format for daily note filenames (e.g., YYYY-MM-DD)')
+      .addText(text => {
+        text.setValue(this.plugin.settings.dailyNoteDateFormat);
+        text.setPlaceholder('YYYY-MM-DD');
+        text.onChange(async (value) => {
+          this.plugin.settings.dailyNoteDateFormat = value || 'YYYY-MM-DD';
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Tasks Heading')
+      .setDesc('Heading under which to add tasks in daily notes')
+      .addText(text => {
+        text.setValue(this.plugin.settings.dailyNoteTasksHeading);
+        text.setPlaceholder('## Tasks');
+        text.onChange(async (value) => {
+          this.plugin.settings.dailyNoteTasksHeading = value || '## Tasks';
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Show Daily Note Button')
+      .setDesc('Show button to open/create today\'s daily note')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.showDailyNoteButton);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.showDailyNoteButton = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Auto-Link Tasks to Daily Note')
+      .setDesc('Automatically add link to daily note when creating tasks')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.autoLinkTasksToDailyNote);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.autoLinkTasksToDailyNote = value;
+          await this.plugin.saveSettings();
+        });
+      });
+  }
+
+  private renderNotificationSection(container: HTMLElement): void {
+    container.createEl('h2', { text: 'Notifications & Reminders' });
+
+    new Setting(container)
+      .setName('Enable Notifications')
+      .setDesc('Show notifications for upcoming and overdue tasks')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.enableNotifications);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.enableNotifications = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Notify on Startup')
+      .setDesc('Show task summary when Obsidian starts')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.notifyOnStartup);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.notifyOnStartup = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Notify Overdue Tasks')
+      .setDesc('Include overdue tasks in notifications')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.notifyOverdueTasks);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.notifyOverdueTasks = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Notify Due Today')
+      .setDesc('Include tasks due today in notifications')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.notifyDueToday);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.notifyDueToday = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Notify Upcoming Tasks')
+      .setDesc('Include upcoming tasks in startup notification')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.notifyUpcoming);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.notifyUpcoming = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Upcoming Days')
+      .setDesc('Number of days to consider as "upcoming"')
+      .addText(text => {
+        text.setValue(String(this.plugin.settings.upcomingDays));
+        text.setPlaceholder('3');
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          this.plugin.settings.upcomingDays = isNaN(num) ? 3 : Math.max(1, num);
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Reminder Interval (minutes)')
+      .setDesc('How often to check and remind about tasks (0 = disabled)')
+      .addText(text => {
+        text.setValue(String(this.plugin.settings.reminderCheckIntervalMinutes));
+        text.setPlaceholder('30');
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          this.plugin.settings.reminderCheckIntervalMinutes = isNaN(num) ? 30 : Math.max(0, num);
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(container)
+      .setName('Show Notification Badge')
+      .setDesc('Show count of urgent tasks as badge')
+      .addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.showNotificationBadge);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.showNotificationBadge = value;
           await this.plugin.saveSettings();
         });
       });

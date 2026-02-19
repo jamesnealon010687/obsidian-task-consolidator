@@ -59,7 +59,26 @@ export const DEFAULT_SETTINGS: TaskConsolidatorSettings = {
   debugMode: false,
   maxTasksToRender: 0,
   enableVirtualScrolling: true,
-  enableTaskCache: true
+  enableTaskCache: true,
+
+  // Daily Note Integration
+  enableDailyNoteIntegration: true,
+  dailyNoteFolder: '',
+  dailyNoteDateFormat: 'YYYY-MM-DD',
+  dailyNoteTasksHeading: '## Tasks',
+  autoLinkTasksToDailyNote: false,
+  showDailyNoteButton: true,
+
+  // Notifications and Reminders
+  enableNotifications: true,
+  notifyOnStartup: true,
+  notifyOverdueTasks: true,
+  notifyDueToday: true,
+  notifyUpcoming: true,
+  upcomingDays: 3,
+  reminderCheckIntervalMinutes: 30,
+  showNotificationBadge: true,
+  lastNotificationCheck: 0
 };
 
 // ========================================

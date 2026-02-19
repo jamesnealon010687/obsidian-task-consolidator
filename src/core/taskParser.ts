@@ -95,7 +95,9 @@ export function parseMetadataString(
     tags: [],
     recurrence: null,
     completedDate: null,
-    createdDate: null
+    createdDate: null,
+    blockedBy: [],
+    blocks: []
   };
 
   const allStages = [...STAGES, ...customStages];
@@ -166,7 +168,7 @@ export function parseMetadataString(
  */
 export function extractInlineMetadata(text: string): { cleanText: string; metadata: Partial<ParsedMetadata> } {
   let cleanText = text;
-  const metadata: Partial<ParsedMetadata> = { tags: [] };
+  const metadata: Partial<ParsedMetadata> = { tags: [], blockedBy: [], blocks: [] };
 
   // Extract completed date
   const completedMatch = cleanText.match(PATTERNS.COMPLETED_DATE);
@@ -195,6 +197,27 @@ export function extractInlineMetadata(text: string): { cleanText: string; metada
     metadata.recurrence = parseRecurrence(recurrenceMatch[1]);
     cleanText = cleanText.replace(PATTERNS.RECURRENCE, '').trim();
   }
+
+  // Extract blocked-by dependencies
+  const blockedByMatches = [...cleanText.matchAll(PATTERNS.BLOCKED_BY)];
+  for (const match of blockedByMatches) {
+    if (match[1]) {
+      // Split by comma for multiple dependencies: [blocked-by:id1,id2]
+      const ids = match[1].split(',').map(id => id.trim()).filter(id => id);
+      metadata.blockedBy!.push(...ids);
+    }
+  }
+  cleanText = cleanText.replace(PATTERNS.BLOCKED_BY, '').trim();
+
+  // Extract blocks dependencies
+  const blocksMatches = [...cleanText.matchAll(PATTERNS.BLOCKS)];
+  for (const match of blocksMatches) {
+    if (match[1]) {
+      const ids = match[1].split(',').map(id => id.trim()).filter(id => id);
+      metadata.blocks!.push(...ids);
+    }
+  }
+  cleanText = cleanText.replace(PATTERNS.BLOCKS, '').trim();
 
   // Extract tags
   const tagMatches = cleanText.matchAll(PATTERNS.TAGS);
@@ -246,7 +269,9 @@ export function parseTaskLine(
     tags: inlineMetadata.tags ?? [],
     recurrence: inlineMetadata.recurrence ?? null,
     completedDate: inlineMetadata.completedDate ?? null,
-    createdDate: inlineMetadata.createdDate ?? null
+    createdDate: inlineMetadata.createdDate ?? null,
+    blockedBy: inlineMetadata.blockedBy ?? [],
+    blocks: inlineMetadata.blocks ?? []
   };
 
   let displayText = taskContent;
@@ -266,7 +291,9 @@ export function parseTaskLine(
       tags: [...new Set([...taskData.tags, ...parsedMetadata.tags])],
       recurrence: taskData.recurrence ?? parsedMetadata.recurrence,
       completedDate: taskData.completedDate ?? parsedMetadata.completedDate,
-      createdDate: taskData.createdDate ?? parsedMetadata.createdDate
+      createdDate: taskData.createdDate ?? parsedMetadata.createdDate,
+      blockedBy: [...new Set([...taskData.blockedBy, ...parsedMetadata.blockedBy])],
+      blocks: [...new Set([...taskData.blocks, ...parsedMetadata.blocks])]
     };
   }
 
@@ -289,7 +316,9 @@ export function parseTaskLine(
     children: [],
     depth: calculateIndentDepth(indent),
     indent,
-    createdDate: taskData.createdDate
+    createdDate: taskData.createdDate,
+    blockedBy: taskData.blockedBy,
+    blocks: taskData.blocks
   };
 }
 

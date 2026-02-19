@@ -184,6 +184,35 @@ export function isDueThisWeek(dateStr: string | null, firstDayOfWeek: number = 0
 // ========================================
 
 /**
+ * Get the next occurrence of a weekday, ensuring it's always in the future
+ * If today is that day, returns next week's occurrence
+ */
+export function getNextWeekdayStrict(dayOfWeek: number, fromDate: Date = getToday()): Date {
+  const result = new Date(fromDate);
+  const currentDay = result.getDay();
+  // Always go to next occurrence, even if today is that day
+  const daysUntil = (dayOfWeek - currentDay + 7) % 7 || 7;
+  result.setDate(result.getDate() + daysUntil);
+  return result;
+}
+
+/**
+ * Get the weekday in the NEXT week (7+ days from now)
+ */
+export function getWeekdayNextWeek(dayOfWeek: number, fromDate: Date = getToday()): Date {
+  const result = new Date(fromDate);
+  const currentDay = result.getDay();
+  // Calculate days until that weekday
+  let daysUntil = (dayOfWeek - currentDay + 7) % 7;
+  // Ensure it's in the next week (at least 7 days away)
+  if (daysUntil < 7) {
+    daysUntil += 7;
+  }
+  result.setDate(result.getDate() + daysUntil);
+  return result;
+}
+
+/**
  * Parse natural language date expressions
  * Returns ISO date string or null if not recognized
  */
@@ -234,35 +263,87 @@ export function parseNaturalDate(input: string): string | null {
     if (unit.startsWith('year')) return formatDateToISO(addYears(today, count));
   }
 
-  // Day names
+  // "X days/weeks/months from now" or "X days/weeks/months from today"
+  const fromNowMatch = text.match(/^(\d+)\s+(day|days|week|weeks|month|months|year|years)\s+from\s+(now|today)$/);
+  if (fromNowMatch) {
+    const count = parseInt(fromNowMatch[1], 10);
+    const unit = fromNowMatch[2];
+
+    if (unit.startsWith('day')) return formatDateToISO(addDays(today, count));
+    if (unit.startsWith('week')) return formatDateToISO(addWeeks(today, count));
+    if (unit.startsWith('month')) return formatDateToISO(addMonths(today, count));
+    if (unit.startsWith('year')) return formatDateToISO(addYears(today, count));
+  }
+
+  // Day names - check "next X" and "this X" first for proper precedence
+  for (let i = 0; i < DAY_NAMES.length; i++) {
+    const fullName = DAY_NAMES[i];
+    const shortName = DAY_NAMES_SHORT[i];
+
+    // "next friday" - always means the Friday in the NEXT week
+    if (text === `next ${fullName}` || text === `next ${shortName}`) {
+      return formatDateToISO(getWeekdayNextWeek(i, today));
+    }
+
+    // "this friday" - if today is Friday, means today; otherwise the upcoming one this week
+    if (text === `this ${fullName}` || text === `this ${shortName}`) {
+      if (today.getDay() === i) {
+        return formatDateToISO(today);
+      }
+      // If the day hasn't occurred yet this week, return it
+      // If it has passed, still return the upcoming one
+      return formatDateToISO(getNextWeekdayStrict(i, today));
+    }
+  }
+
+  // Bare day names (e.g., "friday") - means the next occurrence
+  // If today is Friday, "friday" means NEXT Friday (not today)
   for (let i = 0; i < DAY_NAMES.length; i++) {
     const fullName = DAY_NAMES[i];
     const shortName = DAY_NAMES_SHORT[i];
 
     if (text === fullName || text === shortName) {
-      return formatDateToISO(getNextWeekday(i, today));
-    }
-
-    if (text === `next ${fullName}` || text === `next ${shortName}`) {
-      return formatDateToISO(getNextWeekday(i, addDays(today, 7)));
-    }
-
-    if (text === `this ${fullName}` || text === `this ${shortName}`) {
-      const nextOccurrence = getNextWeekday(i, today);
-      return today.getDay() === i
-        ? formatDateToISO(today)
-        : formatDateToISO(nextOccurrence);
+      return formatDateToISO(getNextWeekdayStrict(i, today));
     }
   }
 
   // Relative week/month
   if (text === 'next week') return formatDateToISO(addWeeks(today, 1));
   if (text === 'next month') return formatDateToISO(addMonths(today, 1));
-  if (text === 'end of week' || text === 'eow') return formatDateToISO(getEndOfWeek(today));
-  if (text === 'end of month' || text === 'eom') return formatDateToISO(getEndOfMonth(today));
 
-  // Next weekday
+  // End of week - if today is the end of the week, still return today
+  if (text === 'end of week' || text === 'eow') {
+    return formatDateToISO(getEndOfWeek(today));
+  }
+
+  // End of month - works correctly even on last day
+  if (text === 'end of month' || text === 'eom') {
+    return formatDateToISO(getEndOfMonth(today));
+  }
+
+  // Start of next week
+  if (text === 'start of next week' || text === 'beginning of next week') {
+    const nextWeekStart = addDays(getStartOfWeek(today), 7);
+    return formatDateToISO(nextWeekStart);
+  }
+
+  // Start of next month
+  if (text === 'start of next month' || text === 'beginning of next month') {
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return formatDateToISO(nextMonth);
+  }
+
+  // Next weekday (skipping weekends)
   if (text === 'weekday' || text === 'next weekday') {
+    let result = addDays(today, 1);
+    while (result.getDay() === 0 || result.getDay() === 6) {
+      result = addDays(result, 1);
+    }
+    return formatDateToISO(result);
+  }
+
+  // "next business day" alias
+  if (text === 'next business day' || text === 'business day') {
     let result = addDays(today, 1);
     while (result.getDay() === 0 || result.getDay() === 6) {
       result = addDays(result, 1);
@@ -276,13 +357,18 @@ export function parseNaturalDate(input: string): string | null {
     const shortName = MONTH_NAMES_SHORT[i];
 
     const monthMatch = text.match(
-      new RegExp(`^(${fullName}|${shortName})\\s+(\\d{1,2})(?:\\s+(\\d{4}))?$`)
+      new RegExp(`^(${fullName}|${shortName})\\s+(\\d{1,2})(?:(?:st|nd|rd|th))?(?:\\s+(\\d{4}))?$`)
     );
 
     if (monthMatch) {
       const day = parseInt(monthMatch[2], 10);
       const year = monthMatch[3] ? parseInt(monthMatch[3], 10) : today.getFullYear();
       const date = new Date(year, i, day);
+
+      // Validate day is valid for the month
+      if (date.getMonth() !== i) {
+        continue; // Invalid day for this month (e.g., Feb 31)
+      }
 
       // If no year specified and date is in the past, use next year
       if (!monthMatch[3] && date < today) {
@@ -292,6 +378,35 @@ export function parseNaturalDate(input: string): string | null {
       if (!isNaN(date.getTime())) {
         return formatDateToISO(date);
       }
+    }
+  }
+
+  // Ordinal dates: "the 15th", "the 1st of next month"
+  const ordinalMatch = text.match(/^the\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+of\s+(this\s+month|next\s+month))?$/);
+  if (ordinalMatch) {
+    const day = parseInt(ordinalMatch[1], 10);
+    const monthModifier = ordinalMatch[2];
+
+    let targetMonth = today.getMonth();
+    let targetYear = today.getFullYear();
+
+    if (monthModifier === 'next month') {
+      targetMonth += 1;
+      if (targetMonth > 11) {
+        targetMonth = 0;
+        targetYear += 1;
+      }
+    }
+
+    const date = new Date(targetYear, targetMonth, day);
+
+    // If no month modifier and the day has passed, use next month
+    if (!monthModifier && date <= today) {
+      date.setMonth(date.getMonth() + 1);
+    }
+
+    if (date.getDate() === day) { // Validate day didn't overflow
+      return formatDateToISO(date);
     }
   }
 
